@@ -3,13 +3,83 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
   body {
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f8fafc;
+    color: #0f172a;
     @apply transition-colors duration-200;
+  }
+
+  html.dark body {
+    background: #0b1120;
+    color: #e2e8f0;
   }
 
   h1, h2, h3, .font-display {
     font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  }
+}
+
+/* Keep legacy light-only utility classes readable when dark mode is active. */
+@layer utilities {
+  .dark .bg-white {
+    background-color: #172033 !important;
+  }
+
+  .dark .bg-white\/70 {
+    background-color: rgb(23 32 51 / 0.78) !important;
+  }
+
+  .dark .bg-slate-50,
+  .dark .bg-slate-50\/70,
+  .dark .bg-slate-50\/80,
+  .dark .bg-slate-50\/90 {
+    background-color: #111a2d !important;
+  }
+
+  .dark .bg-slate-100,
+  .dark .bg-slate-100\/70,
+  .dark .bg-slate-100\/80 {
+    background-color: #1b263b !important;
+  }
+
+  .dark .border-slate-200,
+  .dark .border-slate-200\/80,
+  .dark .border-slate-200\/60,
+  .dark .border-slate-300 {
+    border-color: #2a3852 !important;
+  }
+
+  .dark .text-slate-900 {
+    color: #f1f5f9 !important;
+  }
+
+  .dark .text-slate-800 {
+    color: #e2e8f0 !important;
+  }
+
+  .dark .text-slate-700 {
+    color: #cbd5e1 !important;
+  }
+
+  .dark .text-slate-600 {
+    color: #a8b4c7 !important;
+  }
+
+  .dark .hover\:bg-slate-50:hover {
+    background-color: #1b263b !important;
+  }
+
+  .dark .hover\:bg-slate-100:hover {
+    background-color: #26344d !important;
   }
 }
 

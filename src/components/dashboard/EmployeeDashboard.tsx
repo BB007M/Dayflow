@@ -1,5 +1,6 @@
 import React from 'react';
 import { useHR } from '../../context/HRContext';
+import { formatWorkedHours } from '../../time';
 import { 
   Clock, 
   CalendarDays, 
@@ -507,7 +508,7 @@ export const EmployeeDashboard: React.FC = () => {
                     </span>
                     {record.totalHoursWorked > 0 && (
                       <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                        {record.totalHoursWorked} hrs
+                        {formatWorkedHours(record.totalHoursWorked)}
                       </div>
                     )}
                   </div>

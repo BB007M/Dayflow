@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useHR } from '../../context/HRContext';
+import { formatWorkedSeconds } from '../../time';
 import { 
   Bell, 
   Search, 
@@ -92,13 +93,6 @@ export const Header: React.FC<HeaderProps> = ({
     setIsSearchOpen(false);
     setSearchQuery('');
     openEmployeeProfile(emp);
-  };
-
-  // Format active worked time
-  const formatSeconds = (totalSecs: number) => {
-    const hrs = Math.floor(totalSecs / 3600);
-    const mins = Math.floor((totalSecs % 3600) / 60);
-    return `${hrs}h ${mins}m`;
   };
 
   return (
@@ -239,7 +233,7 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
               {checkInState.isCheckedIn && (
                 <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/70 px-1.5 py-0.5 rounded">
-                  {formatSeconds(checkInState.accumulatedWorkedSeconds)}
+                    {formatWorkedSeconds(checkInState.accumulatedWorkedSeconds)}
                 </span>
               )}
             </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useHR } from '../../context/HRContext';
 import { AttendanceRecord, AttendanceStatus, Department } from '../../types';
+import { formatWorkedClock, formatWorkedHours, formatWorkedSeconds } from '../../time';
 import { 
   Clock, 
   Play, 
@@ -62,14 +63,6 @@ export const AttendanceView: React.FC = () => {
   const [editCheckOut, setEditCheckOut] = useState('05:30 PM');
   const [editHours, setEditHours] = useState(8.5);
   const [editNotes, setEditNotes] = useState('');
-
-  // Format timer
-  const formatTimer = (totalSeconds: number) => {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  };
 
   // Filter records based on role
   // PDF 3.4.2: Employees can view only their own attendance; Admin can view all
@@ -149,7 +142,7 @@ export const AttendanceView: React.FC = () => {
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            Present {hours ? `(${hours}h)` : ''}
+            Present {hours ? `(${formatWorkedClock(hours)})` : ''}
           </span>
         );
       case 'absent':
@@ -163,7 +156,7 @@ export const AttendanceView: React.FC = () => {
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-amber-100 text-amber-800 border border-amber-200">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-            Half-Day {hours ? `(${hours}h)` : ''}
+            Half-Day {hours ? `(${formatWorkedClock(hours)})` : ''}
           </span>
         );
       case 'leave':
@@ -222,8 +215,8 @@ export const AttendanceView: React.FC = () => {
             </div>
             <div className="text-xl sm:text-2xl font-mono font-bold tracking-wider text-white">
               {checkInState.isCheckedIn
-                ? formatTimer(checkInState.accumulatedWorkedSeconds)
-                : '00:00:00'}
+                ? formatWorkedSeconds(checkInState.accumulatedWorkedSeconds)
+                : '0 hr 0 min'}
             </div>
             <div className="text-[11px] text-purple-200 flex items-center gap-1.5 mt-0.5">
               <span className={`w-2 h-2 rounded-full ${checkInState.isCheckedIn ? (checkInState.isOnBreak ? 'bg-amber-400' : 'bg-emerald-400 animate-ping') : 'bg-slate-400'}`} />
@@ -539,7 +532,7 @@ export const AttendanceView: React.FC = () => {
                       </td>
 
                       <td className="py-3 px-4 font-bold text-slate-900">
-                        {rec?.totalHoursWorked ? `${rec.totalHoursWorked} hrs` : '--'}
+                        {formatWorkedHours(rec?.totalHoursWorked)}
                       </td>
 
                       <td className="py-3 px-4 text-slate-600">
@@ -662,7 +655,7 @@ export const AttendanceView: React.FC = () => {
                             {log.check_out_time || '--'}
                           </td>
                           <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
-                            {log.total_hours_worked ? `${log.total_hours_worked} hrs` : '--'}
+                                {formatWorkedHours(log.total_hours_worked)}
                           </td>
                           <td className="py-3 px-4">
                             <span className="capitalize font-medium">{log.status}</span>
