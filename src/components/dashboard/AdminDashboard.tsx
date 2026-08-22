@@ -22,7 +22,15 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
-export const AdminDashboard: React.FC = () => {
+interface AdminDashboardProps {
+  onOpenAddEmployee?: () => void;
+  isDedicatedAdminRoute?: boolean;
+}
+
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
+  onOpenAddEmployee, 
+  isDedicatedAdminRoute = false 
+}) => {
   const { 
     employees, 
     leaveRequests, 
@@ -32,12 +40,27 @@ export const AdminDashboard: React.FC = () => {
     switchUser, 
     openEmployeeProfile, 
     setActiveTab,
+    openAuthModal,
     currentUser
   } = useHR();
 
   const [commentModalLeaveId, setCommentModalLeaveId] = useState<string | null>(null);
   const [rejectComment, setRejectComment] = useState('');
   const [employeeSearch, setEmployeeSearch] = useState('');
+
+  if (!currentUser) {
+    return (
+      <div className="max-w-md mx-auto my-12 text-center p-8 bg-white rounded-2xl border border-slate-200 shadow-sm">
+        <p className="text-slate-600 mb-4 text-xs">Please sign in to access HR administration.</p>
+        <button
+          onClick={() => openAuthModal('signin')}
+          className="px-4 py-2 bg-purple-600 text-white rounded-xl font-medium text-xs shadow-md"
+        >
+          Sign In
+        </button>
+      </div>
+    );
+  }
 
   // Pending leaves queue
   const pendingLeaves = leaveRequests.filter((l) => l.status === 'Pending');
@@ -92,7 +115,7 @@ export const AdminDashboard: React.FC = () => {
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs font-semibold border border-purple-500/30">
               <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-              <span>HR & Executive Management Center</span>
+              <span>{isDedicatedAdminRoute ? 'Admin Console (/admin) • User Provisioning' : 'HR & Executive Management Center'}</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold font-display tracking-tight text-white">
               Welcome back, {currentUser.firstName}! 👑
@@ -105,11 +128,11 @@ export const AdminDashboard: React.FC = () => {
           {/* Quick Action Shortcuts */}
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
             <button
-              onClick={() => setActiveTab('employees')}
-              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs sm:text-sm shadow-md shadow-purple-600/30 flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
+              onClick={() => onOpenAddEmployee ? onOpenAddEmployee() : setActiveTab('employees')}
+              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs sm:text-sm shadow-md shadow-purple-600/30 flex items-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer"
             >
               <UserPlus className="w-4 h-4" />
-              <span>Onboard Employee</span>
+              <span>Add New User / Employee</span>
             </button>
             <button
               onClick={() => setActiveTab('payroll')}

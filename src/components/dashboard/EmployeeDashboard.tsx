@@ -32,8 +32,23 @@ export const EmployeeDashboard: React.FC = () => {
     payslips,
     setActiveTab, 
     openEmployeeProfile,
+    openAuthModal,
     signOut
   } = useHR();
+
+  if (!currentUser) {
+    return (
+      <div className="max-w-md mx-auto my-12 text-center p-8 bg-white rounded-2xl border border-slate-200 shadow-sm">
+        <p className="text-slate-600 mb-4 text-xs">Please sign in to view your employee dashboard.</p>
+        <button
+          onClick={() => openAuthModal('signin')}
+          className="px-4 py-2 bg-purple-600 text-white rounded-xl font-medium text-xs shadow-md"
+        >
+          Sign In
+        </button>
+      </div>
+    );
+  }
 
   // Employee's own pending and recent leaves
   const myLeaves = leaveRequests.filter((l) => l.employeeId === currentUser.employeeId);

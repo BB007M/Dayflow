@@ -17,6 +17,7 @@ import {
   INITIAL_PAYSLIPS, 
   INITIAL_NOTIFICATIONS 
 } from '../data/initialData';
+import { LoginAuditLog } from '../types/auth';
 import confetti from 'canvas-confetti';
 
 interface ToastMessage {
@@ -27,8 +28,9 @@ interface ToastMessage {
 }
 
 interface HRContextType {
-  currentUser: Employee;
+  currentUser: Employee | null;
   currentRole: UserRole;
+  isAuthenticated: boolean;
   employees: Employee[];
   attendanceRecords: AttendanceRecord[];
   leaveRequests: LeaveRequest[];
@@ -42,16 +44,26 @@ interface HRContextType {
   isProfileModalOpen: boolean;
   isAuthModalOpen: boolean;
   authModalMode: 'signin' | 'signup';
+  isDbConnected: boolean;
+  loginAuditLogs: LoginAuditLog[];
+  isAuditDrawerOpen: boolean;
+  isNotificationOpen: boolean;
   
   // Actions
+  setIsNotificationOpen: (open: boolean) => void;
+  openNotificationDrawer: () => void;
+  closeNotificationDrawer: () => void;
   setActiveTab: (tab: string) => void;
   switchUser: (employeeId: string) => void;
   switchRole: (role: UserRole) => void;
   openAuthModal: (mode?: 'signin' | 'signup') => void;
   closeAuthModal: () => void;
-  signIn: (email: string, role: UserRole) => boolean;
-  signUp: (payload: { employeeId: string; email: string; firstName: string; lastName: string; role: UserRole; department: Department }) => boolean;
-  signOut: () => void;
+  signIn: (email: string, role: UserRole, password?: string) => Promise<boolean>;
+  signUp: (payload: { employeeId: string; email: string; firstName: string; lastName: string; role: UserRole; department: Department; password?: string }) => Promise<boolean>;
+  signOut: () => Promise<void>;
+  openAuditDrawer: () => void;
+  closeAuditDrawer: () => void;
+  refreshAuditLogs: () => Promise<void>;
   
   // Attendance
   checkIn: () => void;
@@ -74,7 +86,7 @@ interface HRContextType {
   openEmployeeProfile: (employee: Employee) => void;
   closeEmployeeProfile: () => void;
   updateEmployee: (updated: Employee) => void;
-  addNewEmployee: (newEmployee: Omit<Employee, 'id'>) => void;
+  addNewEmployee: (newEmployee: Omit<Employee, 'id'>, initialPassword?: string) => Promise<void>;
   updateSalaryStructure: (employeeId: string, structure: SalaryStructure) => void;
   
   // Payroll
@@ -91,13 +103,14 @@ interface HRContextType {
 const HRContext = createContext<HRContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  EMPLOYEES: 'dayflow_hrms_employees_v1',
-  ATTENDANCE: 'dayflow_hrms_attendance_v1',
-  LEAVES: 'dayflow_hrms_leaves_v1',
-  PAYSLIPS: 'dayflow_hrms_payslips_v1',
-  NOTIFICATIONS: 'dayflow_hrms_notifications_v1',
-  CURRENT_USER_ID: 'dayflow_hrms_current_user_id_v1',
-  CHECK_IN_STATE: 'dayflow_hrms_checkin_state_v1',
+  EMPLOYEES: 'dayflow_hrms_employees_v2',
+  ATTENDANCE: 'dayflow_hrms_attendance_v2',
+  LEAVES: 'dayflow_hrms_leaves_v2',
+  PAYSLIPS: 'dayflow_hrms_payslips_v2',
+  NOTIFICATIONS: 'dayflow_hrms_notifications_v2',
+  CURRENT_USER_ID: 'dayflow_hrms_current_user_id_v2',
+  AUTH_TOKEN: 'dayflow_hrms_auth_token_v2',
+  CHECK_IN_STATE: 'dayflow_hrms_checkin_state_v2',
 };
 
 export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -107,9 +120,20 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     return saved ? JSON.parse(saved) : INITIAL_EMPLOYEES;
   });
 
-  const [currentUserId, setCurrentUserId] = useState<string>(() => {
+  const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
-    return saved || 'emp-1'; // Default Sarah Jenkins (Admin)
+    if (!saved || saved === 'LOGGED_OUT' || saved === 'null') {
+      return null;
+    }
+    return saved;
+  });
+
+  const [sessionToken, setSessionToken] = useState<string | null>(() => {
+    const savedUserId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
+    if (!savedUserId || savedUserId === 'LOGGED_OUT' || savedUserId === 'null') {
+      return null;
+    }
+    return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
   });
 
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(() => {
@@ -132,12 +156,60 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
   });
 
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const getInitialTab = () => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path === '/admin') return 'admin';
+      if (path === '/employees') return 'employees';
+      if (path === '/attendance') return 'attendance';
+      if (path === '/leaves') return 'leaves';
+      if (path === '/payroll') return 'payroll';
+      if (path === '/analytics') return 'analytics';
+    }
+    return 'dashboard';
+  };
+
+  const [activeTab, setActiveTabState] = useState<string>(getInitialTab);
+
+  const setActiveTab = (tab: string) => {
+    setActiveTabState(tab);
+    if (typeof window !== 'undefined') {
+      const targetPath = tab === 'dashboard' ? '/' : `/${tab}`;
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({ tab }, '', targetPath);
+      }
+    }
+  };
+
+  // Sync browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname;
+        if (path === '/admin') setActiveTabState('admin');
+        else if (path === '/employees') setActiveTabState('employees');
+        else if (path === '/attendance') setActiveTabState('attendance');
+        else if (path === '/leaves') setActiveTabState('leaves');
+        else if (path === '/payroll') setActiveTabState('payroll');
+        else if (path === '/analytics') setActiveTabState('analytics');
+        else setActiveTabState('dashboard');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [selectedEmployeeForModal, setSelectedEmployeeForModal] = useState<Employee | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signin');
+  const [isDbConnected, setIsDbConnected] = useState(false);
+  const [loginAuditLogs, setLoginAuditLogs] = useState<LoginAuditLog[]>([]);
+  const [isAuditDrawerOpen, setIsAuditDrawerOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+
+  const openNotificationDrawer = () => setIsNotificationOpen(true);
+  const closeNotificationDrawer = () => setIsNotificationOpen(false);
 
   // Active check-in state
   const [checkInState, setCheckInState] = useState<CheckInState>(() => {
@@ -156,8 +228,59 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   });
 
   // Current active user
-  const currentUser = employees.find((e) => e.id === currentUserId) || employees[0];
-  const currentRole = currentUser?.role || 'admin';
+  const currentUser = currentUserId ? (employees.find((e) => e.id === currentUserId) || null) : null;
+  const currentRole: UserRole = currentUser?.role || 'admin';
+  const isAuthenticated = !!currentUser;
+
+  // Check Database connection on mount & fetch sync users
+  useEffect(() => {
+    const syncDatabaseState = async () => {
+      try {
+        const res = await fetch('/api/health');
+        if (res.ok) {
+          const data = await res.json();
+          setIsDbConnected(data.db === 'connected');
+        }
+
+        // Fetch verified employees from DB
+        const empRes = await fetch('/api/employees');
+        if (empRes.ok) {
+          const empData = await empRes.json();
+          if (empData.employees && Array.isArray(empData.employees) && empData.employees.length > 0) {
+            setEmployees(empData.employees);
+          }
+        }
+      } catch (err) {
+        console.warn('API sync error:', err);
+      }
+    };
+    syncDatabaseState();
+    refreshAuditLogs();
+  }, []);
+
+  const refreshAuditLogs = async () => {
+    try {
+      const res = await fetch('/api/auth/logs');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.logs && Array.isArray(data.logs)) {
+          const formatted: LoginAuditLog[] = data.logs.map((row: any) => ({
+            id: row.id,
+            userId: row.user_id,
+            email: row.email,
+            role: row.role,
+            status: row.status,
+            ipAddress: row.ip_address,
+            userAgent: row.user_agent,
+            timestamp: row.timestamp,
+          }));
+          setLoginAuditLogs(formatted);
+        }
+      }
+    } catch (err) {
+      console.warn('Error fetching login logs:', err);
+    }
+  };
 
   // Persistence effects
   useEffect(() => {
@@ -165,8 +288,20 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   }, [employees]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, currentUserId);
+    if (currentUserId) {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, currentUserId);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
+    }
   }, [currentUserId]);
+
+  useEffect(() => {
+    if (sessionToken) {
+      localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, sessionToken);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    }
+  }, [sessionToken]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(attendanceRecords));
@@ -217,12 +352,20 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Switch User
+  // Switch User (Persona Switcher)
   const switchUser = (employeeId: string) => {
     const emp = employees.find((e) => e.id === employeeId || e.employeeId === employeeId);
     if (emp) {
       setCurrentUserId(emp.id);
+      setSessionToken(`sess-${Date.now()}`);
       addToast('info', 'Active Persona Switched', `Logged in as ${emp.firstName} ${emp.lastName} (${emp.role.toUpperCase()})`);
+      
+      // Also log switch event to DB
+      fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emp.email, role: emp.role }),
+      }).then(() => refreshAuditLogs()).catch(() => {});
     }
   };
 
@@ -230,6 +373,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     const target = employees.find((e) => e.role === role);
     if (target) {
       setCurrentUserId(target.id);
+      setSessionToken(`sess-${Date.now()}`);
       addToast('info', `Switched to ${role === 'admin' ? 'Admin / HR Officer' : 'Employee'} Role`, `Active profile: ${target.firstName} ${target.lastName}`);
     }
   };
@@ -240,113 +384,200 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   };
 
   const closeAuthModal = () => {
-    setIsAuthModalOpen(false);
+    // If user is already authenticated, allow closing
+    if (currentUser) {
+      setIsAuthModalOpen(false);
+    } else {
+      // Must be logged in
+      addToast('warning', 'Authentication Required', 'Please sign in or select a demo preset account to access Dayflow HRMS.');
+    }
   };
 
-  const signIn = (email: string, role: UserRole) => {
-    const match = employees.find((e) => e.email.toLowerCase() === email.toLowerCase());
-    if (match) {
-      setCurrentUserId(match.id);
-      setIsAuthModalOpen(false);
-      addToast('success', 'Welcome Back!', `Signed in as ${match.firstName} ${match.lastName}`);
-      return true;
-    } else {
-      // Find someone matching the role or fallback
-      const roleMatch = employees.find((e) => e.role === role);
-      if (roleMatch) {
-        setCurrentUserId(roleMatch.id);
+  const openAuditDrawer = () => {
+    refreshAuditLogs();
+    setIsAuditDrawerOpen(true);
+  };
+
+  const closeAuditDrawer = () => {
+    setIsAuditDrawerOpen(false);
+  };
+
+  // Sign In with Supabase backend authentication
+  const signIn = async (email: string, role: UserRole, password?: string): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password, role }),
+      });
+
+      const data = await res.json();
+      await refreshAuditLogs();
+
+      if (res.ok && data.success && data.user) {
+        setEmployees((prev) => {
+          const exists = prev.some((e) => e.id === data.user.id);
+          if (exists) {
+            return prev.map((e) => (e.id === data.user.id ? { ...e, ...data.user } : e));
+          }
+          return [data.user, ...prev];
+        });
+        setCurrentUserId(data.user.id);
+        setSessionToken(data.token || `sess-${Date.now()}`);
         setIsAuthModalOpen(false);
-        addToast('success', 'Sign In Successful', `Demo account: ${roleMatch.firstName} ${roleMatch.lastName}`);
+        addToast('success', 'Verified & Signed In', `Authenticated with Supabase DB as ${data.user.firstName} ${data.user.lastName}`);
         return true;
+      } else {
+        const errorMsg = data.error || 'Account not found in the database. Please check your email or register a new account.';
+        addToast('error', 'Authentication Failed', errorMsg);
+        return false;
       }
-      addToast('error', 'Account Not Found', 'Please enter a valid company email address.');
+    } catch (err) {
+      console.warn('Network sign in error:', err);
+      addToast('error', 'Authentication Failed', 'Account could not be verified in the database.');
       return false;
     }
   };
 
-  const signUp = (payload: {
+  // Sign Up with Supabase backend
+  const signUp = async (payload: {
     employeeId: string;
     email: string;
     firstName: string;
     lastName: string;
     role: UserRole;
     department: Department;
-  }) => {
-    const newEmpId = `emp-${Date.now()}`;
-    const newEmployee: Employee = {
-      id: newEmpId,
-      employeeId: payload.employeeId.toUpperCase(),
-      firstName: payload.firstName,
-      lastName: payload.lastName,
-      email: payload.email,
-      phone: '+1 (555) 000-1122',
-      avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`,
-      role: payload.role,
-      jobDetails: {
-        designation: payload.role === 'admin' ? 'HR Specialist' : 'Associate Specialist',
-        department: payload.department,
-        dateOfJoining: new Date().toISOString().split('T')[0],
-        employmentType: 'Full-Time',
-        workLocation: 'Hybrid',
-        managerName: 'Sarah Jenkins',
-        managerId: 'EMP-1001',
-      },
-      personalDetails: {
-        dob: '1998-05-15',
-        gender: 'Prefer not to say',
-        address: '123 Enterprise Blvd',
-        city: 'San Francisco, CA',
-        country: 'United States',
-        emergencyContactName: 'Family Contact',
-        emergencyContactPhone: '+1 (555) 999-8877',
-        emergencyContactRelation: 'Guardian',
-        nationality: 'American',
-      },
-      salaryStructure: {
-        basicSalary: 6000,
-        hra: 2400,
-        conveyanceAllowance: 400,
-        medicalAllowance: 400,
-        specialAllowance: 1000,
-        providentFund: 720,
-        professionalTax: 200,
-        incomeTax: 1080,
-        currency: 'USD',
-      },
-      leaveBalance: {
-        paidLeave: { total: 18, used: 0, remaining: 18 },
-        sickLeave: { total: 10, used: 0, remaining: 10 },
-        casualLeave: { total: 6, used: 0, remaining: 6 },
-        unpaidLeave: { used: 0 },
-      },
-      documents: [
-        { id: `doc-new-1`, name: 'Employee_Onboarding_Form.pdf', type: 'PDF', uploadDate: new Date().toISOString().split('T')[0], size: '1.1 MB', status: 'Pending' }
-      ],
-      status: 'Active',
-      bankDetails: {
-        bankName: 'Dayflow Federal Credit Union',
-        accountNumberMasked: '•••• •••• •••• 1092',
-        ifscOrRouting: 'DFCU0001',
-        panOrTaxId: 'US-TAX-NEW',
-      },
-    };
+    password?: string;
+  }): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
-    setEmployees((prev) => [newEmployee, ...prev]);
-    setCurrentUserId(newEmpId);
-    setIsAuthModalOpen(false);
-    confetti({ particleCount: 60, spread: 50, origin: { y: 0.6 } });
-    addToast('success', 'Account Registered Successfully', `Welcome to Dayflow HRMS, ${payload.firstName}!`);
-    return true;
+      const data = await res.json();
+      await refreshAuditLogs();
+
+      if (res.ok && data.success) {
+        if (data.user) {
+          setEmployees((prev) => [data.user, ...prev]);
+          setCurrentUserId(data.user.id);
+        } else {
+          // Fallback create
+          const newEmpId = `emp-${Date.now()}`;
+          const newEmp: Employee = {
+            id: newEmpId,
+            employeeId: payload.employeeId.toUpperCase(),
+            firstName: payload.firstName,
+            lastName: payload.lastName,
+            email: payload.email,
+            phone: '+1 (555) 000-1122',
+            avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`,
+            role: payload.role,
+            jobDetails: {
+              designation: payload.role === 'admin' ? 'HR Specialist' : 'Associate Specialist',
+              department: payload.department,
+              dateOfJoining: new Date().toISOString().split('T')[0],
+              employmentType: 'Full-Time',
+              workLocation: 'Hybrid',
+              managerName: 'Sarah Jenkins',
+              managerId: 'EMP-1001',
+            },
+            personalDetails: {
+              dob: '1998-05-15',
+              gender: 'Prefer not to say',
+              address: '123 Enterprise Blvd',
+              city: 'San Francisco, CA',
+              country: 'United States',
+              emergencyContactName: 'Family Contact',
+              emergencyContactPhone: '+1 (555) 999-8877',
+              emergencyContactRelation: 'Guardian',
+              nationality: 'American',
+            },
+            salaryStructure: {
+              basicSalary: 6000,
+              hra: 2400,
+              conveyanceAllowance: 400,
+              medicalAllowance: 400,
+              specialAllowance: 1000,
+              providentFund: 720,
+              professionalTax: 200,
+              incomeTax: 1080,
+              currency: 'USD',
+            },
+            leaveBalance: {
+              paidLeave: { total: 18, used: 0, remaining: 18 },
+              sickLeave: { total: 10, used: 0, remaining: 10 },
+              casualLeave: { total: 6, used: 0, remaining: 6 },
+              unpaidLeave: { used: 0 },
+            },
+            documents: [],
+            status: 'Active',
+            bankDetails: {
+              bankName: 'Dayflow Federal Credit Union',
+              accountNumberMasked: '•••• •••• •••• 1092',
+              ifscOrRouting: 'DFCU0001',
+              panOrTaxId: 'US-TAX-NEW',
+            },
+          };
+          setEmployees((prev) => [newEmp, ...prev]);
+          setCurrentUserId(newEmpId);
+        }
+
+        setSessionToken(data.token || `sess-${Date.now()}`);
+        setIsAuthModalOpen(false);
+        confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+        addToast('success', 'Account Stored in Database', `Welcome to Dayflow HRMS, ${payload.firstName}!`);
+        return true;
+      } else {
+        addToast('error', 'Registration Failed', data.error || 'Could not register user.');
+        return false;
+      }
+    } catch (err) {
+      console.error('Signup error:', err);
+      addToast('error', 'Sign Up Error', 'Could not complete registration.');
+      return false;
+    }
   };
 
-  const signOut = () => {
-    // Switch to first employee or open sign in
-    addToast('info', 'Logged Out', 'You have been signed out of Dayflow HRMS.');
-    openAuthModal('signin');
+  // Sign Out function
+  const signOut = async () => {
+    const userToLog = currentUser;
+    const tokenToClear = sessionToken;
+
+    // Send logout audit log to backend DB
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: tokenToClear,
+          userId: userToLog?.id,
+          email: userToLog?.email,
+          role: userToLog?.role,
+        }),
+      });
+      await refreshAuditLogs();
+    } catch (err) {
+      console.warn('Logout API error:', err);
+    }
+
+    // Clear active session and user
+    setCurrentUserId(null);
+    setSessionToken(null);
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
+    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+
+    // Prompt user to sign in again
+    setAuthModalMode('signin');
+    setIsAuthModalOpen(true);
+    addToast('info', 'Successfully Signed Out', 'Session terminated. Database audit log recorded.');
   };
 
   // Attendance Actions
   const checkIn = () => {
+    if (!currentUser) return;
     const now = new Date();
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
     const todayStr = now.toISOString().split('T')[0];
@@ -360,7 +591,6 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       accumulatedBreakSeconds: 0,
     });
 
-    // Update today's record in attendanceRecords
     setAttendanceRecords((prev) => {
       const existingIndex = prev.findIndex((r) => r.employeeId === currentUser.employeeId && r.date === todayStr);
       if (existingIndex >= 0) {
@@ -392,6 +622,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   };
 
   const checkOut = () => {
+    if (!currentUser) return;
     const now = new Date();
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
     const todayStr = now.toISOString().split('T')[0];
@@ -447,14 +678,15 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   };
 
   const markAttendanceManual = (record: AttendanceRecord) => {
+    const regularizer = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'HR Administrator';
     setAttendanceRecords((prev) => {
       const idx = prev.findIndex((r) => r.id === record.id || (r.employeeId === record.employeeId && r.date === record.date));
       if (idx >= 0) {
         const updated = [...prev];
-        updated[idx] = { ...record, isManual: true, regularizedBy: currentUser.firstName + ' ' + currentUser.lastName };
+        updated[idx] = { ...record, isManual: true, regularizedBy: regularizer };
         return updated;
       }
-      return [{ ...record, isManual: true, regularizedBy: currentUser.firstName + ' ' + currentUser.lastName }, ...prev];
+      return [{ ...record, isManual: true, regularizedBy: regularizer }, ...prev];
     });
     addToast('success', 'Attendance Record Updated', `Successfully regularized attendance for ${record.employeeId} on ${record.date}`);
   };
@@ -468,6 +700,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     isHalfDay: boolean;
     reason: string;
   }) => {
+    if (!currentUser) return;
     const newLeave: LeaveRequest = {
       id: `leave-${Date.now()}`,
       employeeId: currentUser.employeeId,
@@ -506,6 +739,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const reviewLeave = (leaveId: string, status: 'Approved' | 'Rejected', comments?: string) => {
     const targetLeave = leaveRequests.find((l) => l.id === leaveId);
     if (!targetLeave) return;
+    const reviewer = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'HR Director';
 
     setLeaveRequests((prev) =>
       prev.map((l) => {
@@ -513,7 +747,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
           return {
             ...l,
             status,
-            reviewedBy: `${currentUser.firstName} ${currentUser.lastName}`,
+            reviewedBy: reviewer,
             reviewedAt: new Date().toISOString(),
             adminComments: comments || (status === 'Approved' ? 'Leave approved by HR.' : 'Request could not be accommodated at this time.'),
           };
@@ -581,7 +815,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
       title: `Leave Request ${status}`,
-      message: `Your ${targetLeave.leaveType} leave request (${targetLeave.startDate} to ${targetLeave.endDate}) was ${status.toLowerCase()} by ${currentUser.firstName} ${currentUser.lastName}.`,
+      message: `Your ${targetLeave.leaveType} leave request (${targetLeave.startDate} to ${targetLeave.endDate}) was ${status.toLowerCase()} by ${reviewer}.`,
       timestamp: 'Just now',
       isRead: false,
       type: 'leave',
@@ -621,15 +855,35 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     addToast('success', 'Profile Updated', `Changes to ${updated.firstName} ${updated.lastName}'s profile have been saved.`);
   };
 
-  const addNewEmployee = (newEmployeeData: Omit<Employee, 'id'>) => {
+  const addNewEmployee = async (newEmployeeData: Omit<Employee, 'id'>, initialPassword?: string) => {
     const newId = `emp-${Date.now()}`;
     const completeEmp: Employee = {
       ...newEmployeeData,
       id: newId,
     };
     setEmployees((prev) => [completeEmp, ...prev]);
+
+    // Also persist user credentials to backend / Supabase
+    try {
+      await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: completeEmp.employeeId,
+          email: completeEmp.email,
+          firstName: completeEmp.firstName,
+          lastName: completeEmp.lastName,
+          role: completeEmp.role,
+          department: completeEmp.jobDetails.department,
+          password: initialPassword || 'EmployeePass2026!',
+        }),
+      });
+    } catch (err) {
+      console.warn('Backend sync failed:', err);
+    }
+
     confetti({ particleCount: 70, spread: 70 });
-    addToast('success', 'Employee Onboarded', `${completeEmp.firstName} ${completeEmp.lastName} (${completeEmp.employeeId}) has been added to the system.`);
+    addToast('success', 'User Provisioned & Onboarded', `${completeEmp.firstName} ${completeEmp.lastName} (${completeEmp.employeeId}) has been created with login access.`);
   };
 
   const updateSalaryStructure = (employeeId: string, structure: SalaryStructure) => {
@@ -683,7 +937,6 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     });
 
     setPayslips((prev) => {
-      // replace existing for this month or append
       const filtered = prev.filter((p) => !(p.month === month && p.year === year));
       return [...newSlips, ...filtered];
     });
@@ -736,7 +989,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     if (n.isRead) return false;
     if (n.targetRole === 'all') return true;
     if (n.targetRole === currentRole) return true;
-    if (n.targetEmployeeId && n.targetEmployeeId === currentUser.employeeId) return true;
+    if (n.targetEmployeeId && currentUser && n.targetEmployeeId === currentUser.employeeId) return true;
     return false;
   }).length;
 
@@ -745,6 +998,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       value={{
         currentUser,
         currentRole,
+        isAuthenticated,
         employees,
         attendanceRecords,
         leaveRequests,
@@ -758,6 +1012,13 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         isProfileModalOpen,
         isAuthModalOpen,
         authModalMode,
+        isDbConnected,
+        loginAuditLogs,
+        isAuditDrawerOpen,
+        isNotificationOpen,
+        setIsNotificationOpen,
+        openNotificationDrawer,
+        closeNotificationDrawer,
         setActiveTab,
         switchUser,
         switchRole,
@@ -766,6 +1027,9 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         signIn,
         signUp,
         signOut,
+        openAuditDrawer,
+        closeAuditDrawer,
+        refreshAuditLogs,
         checkIn,
         checkOut,
         toggleBreak,

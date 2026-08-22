@@ -48,7 +48,7 @@ export const EmployeeProfileModal: React.FC = () => {
   if (!isProfileModalOpen || !formData) return null;
 
   const isAdmin = currentRole === 'admin';
-  const isOwner = currentUser.id === formData.id;
+  const isOwner = currentUser ? currentUser.id === formData.id : false;
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();

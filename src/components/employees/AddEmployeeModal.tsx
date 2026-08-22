@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useHR } from '../../context/HRContext';
 import { Department, EmploymentType, WorkLocation, UserRole } from '../../types';
-import { X, UserPlus, Building2, ShieldCheck, User, Sparkles } from 'lucide-react';
+import { X, UserPlus, Building2, ShieldCheck, User, Sparkles, Lock, Eye, EyeOff, KeyRound } from 'lucide-react';
 
 interface AddEmployeeModalProps {
   isOpen: boolean;
@@ -24,6 +24,8 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onCl
   const [managerName, setManagerName] = useState('Sarah Jenkins');
   const [city, setCity] = useState('San Francisco, CA');
   const [basicSalary, setBasicSalary] = useState(6500);
+  const [initialPassword, setInitialPassword] = useState('EmployeePass2026!');
+  const [showPassword, setShowPassword] = useState(false);
 
   if (!isOpen) return null;
 
@@ -100,7 +102,7 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onCl
         ifscOrRouting: 'DFCU0001',
         panOrTaxId: 'US-TAX-NEW',
       },
-    });
+    }, initialPassword);
 
     onClose();
   };
@@ -251,6 +253,43 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onCl
                 onChange={(e) => setCity(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300"
               />
+            </div>
+
+            {/* Login Credentials Provisioning */}
+            <div className="sm:col-span-2 p-3.5 rounded-2xl bg-purple-50/70 border border-purple-200/80">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <KeyRound className="w-4 h-4 text-purple-600" />
+                  <span className="text-xs font-bold text-slate-800">Initial Login Password</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setInitialPassword(`Pass${Math.floor(1000 + Math.random() * 9000)}!`)}
+                  className="text-[11px] font-semibold text-purple-700 hover:underline"
+                >
+                  Generate Strong Pass
+                </button>
+              </div>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={initialPassword}
+                  onChange={(e) => setInitialPassword(e.target.value)}
+                  className="w-full pl-9 pr-10 py-2 text-xs font-mono rounded-xl bg-white border border-purple-200 focus:border-purple-600 outline-none text-slate-900"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-500 hover:text-purple-700"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1.5">
+                The employee will use this password alongside their work email (<strong>{email || 'provided above'}</strong>) to sign in.
+              </p>
             </div>
 
           </div>

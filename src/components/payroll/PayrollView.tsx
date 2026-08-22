@@ -26,6 +26,7 @@ export const PayrollView: React.FC = () => {
     payslips, 
     employees, 
     generateMonthlyPayroll,
+    openAuthModal,
     addToast
   } = useHR();
 
@@ -34,6 +35,20 @@ export const PayrollView: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState('February 2026');
   const [searchEmployee, setSearchEmployee] = useState('');
   const [selectedPayslipForModal, setSelectedPayslipForModal] = useState<Payslip | null>(null);
+
+  if (!currentUser) {
+    return (
+      <div className="max-w-md mx-auto my-12 text-center p-8 bg-white rounded-2xl border border-slate-200 shadow-sm">
+        <p className="text-slate-600 mb-4 text-xs">Please sign in to view salary and payslip records.</p>
+        <button
+          onClick={() => openAuthModal('signin')}
+          className="px-4 py-2 bg-purple-600 text-white rounded-xl font-medium text-xs shadow-md"
+        >
+          Sign In
+        </button>
+      </div>
+    );
+  }
 
   // Filter visible payslips
   const visiblePayslips = payslips.filter((p) => {

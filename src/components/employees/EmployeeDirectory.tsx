@@ -201,7 +201,7 @@ export const EmployeeDirectory: React.FC<EmployeeDirectoryProps> = ({ onOpenAddE
         /* Grid Layout */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredEmployees.map((emp) => {
-            const isMe = emp.id === currentUser.id;
+            const isMe = currentUser ? emp.id === currentUser.id : false;
             return (
               <div
                 key={emp.id}

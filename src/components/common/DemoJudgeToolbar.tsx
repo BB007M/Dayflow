@@ -57,38 +57,8 @@ export const DemoJudgeToolbar: React.FC = () => {
             Hackathon Judge Dock
           </div>
           <span className="text-slate-400 text-xs hidden lg:inline">
-            Active view: <strong className="text-purple-200">{currentUser.firstName} {currentUser.lastName}</strong> ({currentRole === 'admin' ? 'HR / Admin Privileges' : 'Employee Persona'})
+            Active view: <strong className="text-purple-200">{currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Not Signed In'}</strong> ({currentRole === 'admin' ? 'HR / Admin Privileges' : 'Employee Persona'})
           </span>
-        </div>
-
-        {/* Center: 1-Click Persona Switch Buttons */}
-        <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
-          <span className="text-slate-400 text-[11px] mr-1 hidden sm:inline">Switch Persona:</span>
-          
-          {employees.slice(0, 4).map((emp) => {
-            const isActive = emp.id === currentUser.id;
-            return (
-              <button
-                key={emp.id}
-                onClick={() => switchUser(emp.id)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
-                  isActive
-                    ? 'bg-purple-600 text-white ring-2 ring-purple-400/50 shadow-sm'
-                    : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60'
-                }`}
-              >
-                {emp.role === 'admin' ? (
-                  <ShieldCheck className="w-3 h-3 text-amber-400" />
-                ) : (
-                  <UserCheck className="w-3 h-3 text-sky-400" />
-                )}
-                <span>{emp.firstName}</span>
-                <span className="text-[10px] opacity-75">
-                  ({emp.role === 'admin' ? 'HR' : 'Emp'})
-                </span>
-              </button>
-            );
-          })}
         </div>
 
         {/* Right: Quick Action Shortcuts */}

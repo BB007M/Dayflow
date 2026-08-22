@@ -9,40 +9,40 @@ import {
   ChevronDown, 
   LogOut, 
   Clock, 
-  Check, 
   Briefcase,
   Layers,
   Menu,
-  X
+  Database,
+  LogIn
 } from 'lucide-react';
 
 interface HeaderProps {
-  onToggleSidebar?: () => void;
+  onToggleMobileSidebar?: () => void;
   onOpenAssistant?: () => void;
-  onOpenNotifications?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
-  onToggleSidebar, 
+  onToggleMobileSidebar, 
   onOpenAssistant,
-  onOpenNotifications
 }) => {
   const { 
     currentUser, 
     currentRole, 
     switchRole, 
-    switchUser, 
     employees, 
     checkInState, 
     openEmployeeProfile, 
     unreadNotificationCount, 
     openAuthModal,
     signOut,
-    setActiveTab
+    setActiveTab,
+    isNotificationOpen,
+    setIsNotificationOpen,
+    openAuditDrawer,
+    isDbConnected
   } = useHR();
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<typeof employees>([]);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -55,7 +55,6 @@ export const Header: React.FC<HeaderProps> = ({
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsUserMenuOpen(false);
-        setIsRoleDropdownOpen(false);
       }
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setIsSearchOpen(false);
@@ -99,13 +98,13 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 lg:px-6 py-3 transition-all">
+    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 lg:px-6 py-3 transition-all">
       <div className="flex items-center justify-between gap-3 max-w-7xl mx-auto">
         
         {/* Left: Mobile menu toggle + Logo / Tagline */}
         <div className="flex items-center gap-3">
           <button
-            onClick={onToggleSidebar}
+            onClick={onToggleMobileSidebar}
             className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg lg:hidden transition-colors"
             aria-label="Toggle navigation menu"
           >
@@ -150,22 +149,19 @@ export const Header: React.FC<HeaderProps> = ({
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="text-slate-400 hover:text-slate-600 text-xs absolute right-3 top-1/2 -translate-y-1/2"
               >
-                <X className="w-3.5 h-3.5" />
+                Clear
               </button>
             )}
           </div>
 
           {/* Search Dropdown */}
           {isSearchOpen && (
-            <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-slate-200 p-2 z-50 max-h-80 overflow-y-auto">
-              <div className="text-[11px] font-semibold text-slate-400 px-3 py-1 uppercase tracking-wider">
-                Matching Employees ({searchResults.length})
-              </div>
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 max-h-72 overflow-y-auto">
               {searchResults.length === 0 ? (
                 <div className="p-4 text-center text-xs text-slate-500">
-                  No employee records found matching "{searchQuery}"
+                  No matching employees found for "{searchQuery}"
                 </div>
               ) : (
                 searchResults.map((emp) => (
@@ -195,43 +191,45 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        {/* Right: Punch Status, Role Switcher, Copilot, Notifications & Profile */}
+        {/* Right: DB Logs, Punch Status, Notifications & Profile */}
         <div className="flex items-center gap-2 sm:gap-3">
           
-          {/* Real-time Punch Status pill (Employee quick glance) */}
-          <div 
-            onClick={() => setActiveTab('attendance')}
-            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200/80 cursor-pointer border border-slate-200/60 transition-colors text-xs"
-            title="Click to view full attendance logs"
-          >
-            <div className={`w-2 h-2 rounded-full ${checkInState.isCheckedIn ? (checkInState.isOnBreak ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500 animate-pulse') : 'bg-slate-400'}`} />
-            <span className="font-medium text-slate-700">
-              {checkInState.isCheckedIn
-                ? checkInState.isOnBreak
-                  ? 'On Break'
-                  : `In: ${checkInState.checkInTimestamp || '09:00 AM'}`
-                : 'Punched Out'}
-            </span>
-            {checkInState.isCheckedIn && (
-              <span className="text-[11px] font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">
-                {formatSeconds(checkInState.accumulatedWorkedSeconds)}
-              </span>
-            )}
-          </div>
-
-          {/* AI Assistant Button */}
+          {/* Supabase DB Auth Logs Button */}
           <button
-            onClick={onOpenAssistant}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl border border-purple-200 transition-all hover:shadow-sm"
-            title="Ask Dayflow AI HR Copilot"
+            onClick={openAuditDrawer}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-purple-50 hover:text-purple-700 rounded-xl border border-slate-200 transition-all"
+            title="View Supabase Login & Audit Logs"
           >
-            <Sparkles className="w-3.5 h-3.5 text-purple-600 animate-pulse" />
-            <span className="hidden sm:inline">AI Copilot</span>
+            <Database className="w-3.5 h-3.5 text-purple-600" />
+            <span className="hidden sm:inline">DB Logs</span>
           </button>
+
+          {/* Real-time Punch Status pill */}
+          {currentUser && (
+            <div 
+              onClick={() => setActiveTab('attendance')}
+              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200/80 cursor-pointer border border-slate-200/60 transition-colors text-xs"
+              title="Click to view full attendance logs"
+            >
+              <div className={`w-2 h-2 rounded-full ${checkInState.isCheckedIn ? (checkInState.isOnBreak ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500 animate-pulse') : 'bg-slate-400'}`} />
+              <span className="font-medium text-slate-700">
+                {checkInState.isCheckedIn
+                  ? checkInState.isOnBreak
+                    ? 'On Break'
+                    : `In: ${checkInState.checkInTimestamp || '09:00 AM'}`
+                  : 'Punched Out'}
+              </span>
+              {checkInState.isCheckedIn && (
+                <span className="text-[11px] font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">
+                  {formatSeconds(checkInState.accumulatedWorkedSeconds)}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Notifications Button */}
           <button
-            onClick={onOpenNotifications}
+            onClick={() => setIsNotificationOpen(true)}
             className="relative p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
             aria-label="View notifications"
           >
@@ -243,147 +241,123 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </button>
 
-          {/* User Profile & Role Dropdown */}
-          <div ref={menuRef} className="relative">
-            <button
-              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-              className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-xl hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200"
-            >
-              <img
-                src={currentUser.avatar}
-                alt={currentUser.firstName}
-                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-cover ring-2 ring-purple-500/20"
-              />
-              <div className="hidden xl:flex flex-col text-left">
-                <span className="text-xs font-semibold text-slate-800 leading-tight">
-                  {currentUser.firstName} {currentUser.lastName}
-                </span>
-                <span className="text-[10px] text-slate-500 font-medium">
-                  {currentRole === 'admin' ? 'HR Director (Admin)' : currentUser.jobDetails.designation}
-                </span>
-              </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-            </button>
-
-            {/* User Dropdown Menu */}
-            {isUserMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 text-xs">
-                {/* Active user header */}
-                <div className="p-3 bg-slate-50 rounded-xl mb-2 border border-slate-100">
-                  <div className="font-semibold text-slate-900 text-sm">
+          {/* User Profile & Role Dropdown or Sign In */}
+          {currentUser ? (
+            <div ref={menuRef} className="relative">
+              <button
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-xl hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200"
+              >
+                <img
+                  src={currentUser.avatar}
+                  alt={currentUser.firstName}
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-cover ring-2 ring-purple-500/20"
+                />
+                <div className="hidden xl:flex flex-col text-left">
+                  <span className="text-xs font-semibold text-slate-800 leading-tight">
                     {currentUser.firstName} {currentUser.lastName}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5 truncate">
-                    {currentUser.email}
-                  </div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-purple-100 text-purple-800">
-                      <ShieldCheck className="w-3 h-3" />
-                      {currentRole === 'admin' ? 'Admin / HR' : 'Employee'}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      {currentUser.employeeId}
-                    </span>
-                  </div>
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-medium">
+                    {currentRole === 'admin' ? 'HR Director (Admin)' : currentUser.jobDetails.designation}
+                  </span>
                 </div>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              </button>
 
-                {/* Role Switcher in Menu */}
-                <div className="px-2 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                  Active Role Switch
-                </div>
-                <div className="grid grid-cols-2 gap-1 mb-2">
+              {/* User Dropdown Menu */}
+              {isUserMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 text-xs">
+                  {/* Active user header */}
+                  <div className="p-3 bg-slate-50 rounded-xl mb-2 border border-slate-100">
+                    <div className="font-semibold text-slate-900 text-sm">
+                      {currentUser.firstName} {currentUser.lastName}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 truncate">
+                      {currentUser.email}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-purple-100 text-purple-800">
+                        <ShieldCheck className="w-3 h-3" />
+                        {currentRole === 'admin' ? 'Admin / HR' : 'Employee'}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {currentUser.employeeId}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="h-px bg-slate-100 my-1" />
+
+                  {/* Actions */}
                   <button
                     onClick={() => {
-                      switchRole('admin');
+                      openEmployeeProfile(currentUser);
                       setIsUserMenuOpen(false);
                     }}
-                    className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg font-medium transition-all ${
-                      currentRole === 'admin'
-                        ? 'bg-purple-600 text-white shadow-sm'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors text-left"
                   >
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    Admin
+                    <User className="w-4 h-4 text-slate-400" />
+                    View & Edit My Profile
                   </button>
+
                   <button
                     onClick={() => {
-                      switchRole('employee');
+                      setActiveTab('attendance');
                       setIsUserMenuOpen(false);
                     }}
-                    className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg font-medium transition-all ${
-                      currentRole === 'employee'
-                        ? 'bg-purple-600 text-white shadow-sm'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors text-left"
                   >
-                    <User className="w-3.5 h-3.5" />
-                    Employee
+                    <Clock className="w-4 h-4 text-slate-400" />
+                    Attendance & Punch Logs
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setActiveTab('payroll');
+                      setIsUserMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors text-left"
+                  >
+                    <Briefcase className="w-4 h-4 text-slate-400" />
+                    Salary & Payslips
+                  </button>
+
+                  <div className="h-px bg-slate-100 my-1" />
+
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      signOut();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors text-left font-semibold"
+                  >
+                    <LogOut className="w-4 h-4 text-rose-500" />
+                    Sign Out (Logout)
                   </button>
                 </div>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={() => openAuthModal('signin')}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-md shadow-purple-600/20 transition-all"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Sign In</span>
+            </button>
+          )}
 
-                <div className="h-px bg-slate-100 my-1" />
-
-                {/* Actions */}
-                <button
-                  onClick={() => {
-                    openEmployeeProfile(currentUser);
-                    setIsUserMenuOpen(false);
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors text-left"
-                >
-                  <User className="w-4 h-4 text-slate-400" />
-                  View & Edit My Profile
-                </button>
-
-                <button
-                  onClick={() => {
-                    setActiveTab('attendance');
-                    setIsUserMenuOpen(false);
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors text-left"
-                >
-                  <Clock className="w-4 h-4 text-slate-400" />
-                  Attendance & Punch Logs
-                </button>
-
-                <button
-                  onClick={() => {
-                    setActiveTab('payroll');
-                    setIsUserMenuOpen(false);
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors text-left"
-                >
-                  <Briefcase className="w-4 h-4 text-slate-400" />
-                  Salary & Payslips
-                </button>
-
-                <div className="h-px bg-slate-100 my-1" />
-
-                <button
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    openAuthModal('signin');
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-purple-700 hover:bg-purple-50 rounded-lg transition-colors text-left font-medium"
-                >
-                  <User className="w-4 h-4 text-purple-600" />
-                  Switch / Sign In Other User
-                </button>
-
-                <button
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    signOut();
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors text-left font-medium"
-                >
-                  <LogOut className="w-4 h-4 text-rose-500" />
-                  Sign Out
-                </button>
-              </div>
-            )}
-          </div>
+          {/* Dedicated Direct Logout Button */}
+          {currentUser && (
+            <button
+              onClick={() => signOut()}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl border border-rose-200 transition-all shadow-sm cursor-pointer"
+              title="Sign Out of Session"
+            >
+              <LogOut className="w-3.5 h-3.5 text-rose-600" />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
+          )}
 
         </div>
       </div>

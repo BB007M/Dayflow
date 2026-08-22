@@ -70,7 +70,9 @@ export const AttendanceView: React.FC = () => {
         const matchesDept = selectedDept === 'All' || e.jobDetails.department === selectedDept;
         return matchesSearch && matchesDept;
       })
-    : employees.filter((e) => e.id === currentUser.id);
+    : currentUser 
+      ? employees.filter((e) => e.id === currentUser.id)
+      : [];
 
   // Days for the weekly view (last 7 days from selectedDate)
   const getWeeklyDates = () => {
@@ -194,7 +196,9 @@ export const AttendanceView: React.FC = () => {
           <p className="text-xs sm:text-sm text-purple-200/90 mt-0.5">
             {isAdmin
               ? `Reviewing attendance records across all ${employees.length} team members. Admin regularize enabled.`
-              : `Logged in as ${currentUser.firstName} ${currentUser.lastName} (${currentUser.employeeId}).`}
+              : currentUser 
+                ? `Logged in as ${currentUser.firstName} ${currentUser.lastName} (${currentUser.employeeId}).`
+                : 'Please sign in to view your attendance.'}
           </p>
         </div>
 
