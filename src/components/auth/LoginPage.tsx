@@ -210,9 +210,6 @@ export const LoginPage: React.FC = () => {
                       <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">sarveshv6413@gmail.com</div>
                     </div>
                   </div>
-                  <div className="text-right text-[10px] text-slate-500 dark:text-slate-400">
-                    <div>Pass: <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">SarvesH@07</span></div>
-                  </div>
                 </div>
               </div>
 

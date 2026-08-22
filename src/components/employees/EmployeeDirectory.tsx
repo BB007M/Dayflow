@@ -36,7 +36,6 @@ export const EmployeeDirectory: React.FC<EmployeeDirectoryProps> = ({ onOpenAddE
     employees, 
     currentUser, 
     currentRole, 
-    switchUser, 
     openEmployeeProfile,
     terminateEmployee,
     rehireEmployee,
@@ -377,21 +376,13 @@ export const EmployeeDirectory: React.FC<EmployeeDirectoryProps> = ({ onOpenAddE
 
                 {/* Card footer actions */}
                 <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <button
-                      onClick={() => switchUser(emp.id)}
-                      className="flex-1 py-1.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-slate-700 dark:text-slate-200 hover:text-purple-700 dark:hover:text-purple-300 font-semibold text-xs transition-colors cursor-pointer"
-                    >
-                      Switch
-                    </button>
-                    <button
-                      onClick={() => openEmployeeProfile(emp)}
-                      className="py-1.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition-all shadow-xs flex items-center gap-1 cursor-pointer"
-                    >
-                      <span>Profile</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => openEmployeeProfile(emp)}
+                    className="w-full py-1.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <span>Profile</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
 
                   {/* Admin Fire / Terminate Button */}
                   {currentRole === 'admin' && !isMe && (
@@ -482,12 +473,6 @@ export const EmployeeDirectory: React.FC<EmployeeDirectoryProps> = ({ onOpenAddE
 
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => switchUser(emp.id)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-purple-600 hover:text-white text-slate-700 font-semibold text-[11px] transition-colors cursor-pointer"
-                          >
-                            Switch
-                          </button>
                           <button
                             onClick={() => openEmployeeProfile(emp)}
                             className="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold text-[11px] transition-colors cursor-pointer"
