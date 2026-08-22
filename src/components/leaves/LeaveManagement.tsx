@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useHR } from '../../context/HRContext';
 import { LeaveType, LeaveRequest, LeaveStatus } from '../../types';
 import { 
@@ -16,7 +16,9 @@ import {
   Sparkles,
   Info,
   ChevronDown,
-  MessageSquare
+  MessageSquare,
+  Lock,
+  AlertTriangle
 } from 'lucide-react';
 
 export const LeaveManagement: React.FC = () => {
@@ -46,13 +48,74 @@ export const LeaveManagement: React.FC = () => {
     );
   }
 
+  // Quota balances for current user
+  const paidRemaining = currentUser.leaveBalance.paidLeave.remaining;
+  const sickRemaining = currentUser.leaveBalance.sickLeave.remaining;
+  const casualRemaining = currentUser.leaveBalance.casualLeave.remaining;
+  const allPaidExhausted = paidRemaining <= 0 && sickRemaining <= 0 && casualRemaining <= 0;
+
+  // Determine initial valid leave type
+  const getInitialLeaveType = (): LeaveType => {
+    if (paidRemaining > 0) return 'Paid';
+    if (sickRemaining > 0) return 'Sick';
+    if (casualRemaining > 0) return 'Casual';
+    return 'Unpaid';
+  };
+
   // Apply Leave Form state
-  const [leaveType, setLeaveType] = useState<LeaveType>('Paid');
+  const [leaveType, setLeaveType] = useState<LeaveType>(getInitialLeaveType);
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [isHalfDay, setIsHalfDay] = useState(false);
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Automatically switch leaveType if currently selected option gets exhausted to 0
+  useEffect(() => {
+    if (leaveType === 'Paid' && paidRemaining <= 0) {
+      if (sickRemaining > 0) setLeaveType('Sick');
+      else if (casualRemaining > 0) setLeaveType('Casual');
+      else setLeaveType('Unpaid');
+    } else if (leaveType === 'Sick' && sickRemaining <= 0) {
+      if (paidRemaining > 0) setLeaveType('Paid');
+      else if (casualRemaining > 0) setLeaveType('Casual');
+      else setLeaveType('Unpaid');
+    } else if (leaveType === 'Casual' && casualRemaining <= 0) {
+      if (paidRemaining > 0) setLeaveType('Paid');
+      else if (sickRemaining > 0) setLeaveType('Sick');
+      else setLeaveType('Unpaid');
+    }
+  }, [paidRemaining, sickRemaining, casualRemaining, leaveType]);
+
+  // Handle start date changes: automatically update end date if it is behind start date or if single-day leave or half-day
+  const handleStartDateChange = (newStart: string) => {
+    setStartDate(newStart);
+    if (isHalfDay) {
+      setEndDate(newStart);
+    } else if (!endDate || endDate < newStart || endDate === startDate) {
+      setEndDate(newStart);
+    }
+  };
+
+  // Handle end date changes: if half day was ticked and end date is changed, remove the half day tick
+  const handleEndDateChange = (newEnd: string) => {
+    if (isHalfDay) {
+      setIsHalfDay(false);
+    }
+    if (startDate && newEnd < startDate) {
+      setEndDate(startDate);
+    } else {
+      setEndDate(newEnd);
+    }
+  };
+
+  // Handle half-day checkbox toggle: synchronize end date with start date when checked
+  const handleHalfDayToggle = (checked: boolean) => {
+    setIsHalfDay(checked);
+    if (checked) {
+      setEndDate(startDate);
+    }
+  };
 
   // Filter state for requests table
   const [statusFilter, setStatusFilter] = useState<string>('All');
@@ -66,34 +129,39 @@ export const LeaveManagement: React.FC = () => {
   // Calculate day difference
   const calculateTotalDays = () => {
     if (isHalfDay) return 0.5;
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    if (!startDate || !endDate) return 1;
+    if (startDate === endDate) return 1;
+
+    const [sY, sM, sD] = startDate.split('-').map(Number);
+    const [eY, eM, eD] = endDate.split('-').map(Number);
+    if (!sY || !sM || !sD || !eY || !eM || !eD) return 1;
+
+    // Use noon in local time to avoid any timezone or daylight savings shifts
+    const start = new Date(sY, sM - 1, sD, 12, 0, 0);
+    const end = new Date(eY, eM - 1, eD, 12, 0, 0);
     if (end < start) return 1;
+
     let count = 0;
     const cur = new Date(start);
     while (cur <= end) {
       const day = cur.getDay();
-      if (day !== 0 && day !== 6) count++;
+      if (day !== 0 && day !== 6) {
+        count++;
+      }
       cur.setDate(cur.getDate() + 1);
     }
+
+    // If selected range is exclusively during a weekend, calculate calendar days
+    if (count === 0) {
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      return Math.max(diffDays, 1);
+    }
+
     return Math.max(count, 1);
   };
 
   const totalDays = calculateTotalDays();
-
-  // Remaining balance for the currently selected leave type. Unpaid /
-  // Maternity-Paternity leave is not capped by the standard quota.
-  const remainingForSelectedType: number | null =
-    leaveType === 'Paid'
-      ? currentUser.leaveBalance.paidLeave.remaining
-      : leaveType === 'Sick'
-      ? currentUser.leaveBalance.sickLeave.remaining
-      : leaveType === 'Casual'
-      ? currentUser.leaveBalance.casualLeave.remaining
-      : null;
-
-  const exceedsBalance =
-    remainingForSelectedType !== null && totalDays > remainingForSelectedType;
 
   const handleApplySubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,14 +170,31 @@ export const LeaveManagement: React.FC = () => {
       return;
     }
 
-    if (exceedsBalance) {
-      addToast(
-        'error',
-        'Insufficient Leave Balance',
-        remainingForSelectedType === 0
-          ? `You have no ${leaveType} leave remaining.`
-          : `You only have ${remainingForSelectedType} day(s) of ${leaveType} leave remaining, but requested ${totalDays}.`
-      );
+    // Strict quota checking
+    if (leaveType === 'Paid' && paidRemaining <= 0) {
+      addToast('warning', 'Paid Leave Locked', 'Your Paid Leave quota is 0. Please select Unpaid Leave (Loss of Pay).');
+      return;
+    }
+    if (leaveType === 'Sick' && sickRemaining <= 0) {
+      addToast('warning', 'Sick Leave Locked', 'Your Sick Leave quota is 0. Please select Unpaid Leave (Loss of Pay).');
+      return;
+    }
+    if (leaveType === 'Casual' && casualRemaining <= 0) {
+      addToast('warning', 'Casual Leave Locked', 'Your Casual Leave quota is 0. Please select Unpaid Leave (Loss of Pay).');
+      return;
+    }
+
+    // Insufficient remaining days check
+    if (leaveType === 'Paid' && totalDays > paidRemaining) {
+      addToast('warning', 'Insufficient Balance', `You only have ${paidRemaining} Paid leave day(s) remaining for a ${totalDays}-day request. Please choose Unpaid Leave.`);
+      return;
+    }
+    if (leaveType === 'Sick' && totalDays > sickRemaining) {
+      addToast('warning', 'Insufficient Balance', `You only have ${sickRemaining} Sick leave day(s) remaining for a ${totalDays}-day request. Please choose Unpaid Leave.`);
+      return;
+    }
+    if (leaveType === 'Casual' && totalDays > casualRemaining) {
+      addToast('warning', 'Insufficient Balance', `You only have ${casualRemaining} Casual leave day(s) remaining for a ${totalDays}-day request. Please choose Unpaid Leave.`);
       return;
     }
 
@@ -124,6 +209,9 @@ export const LeaveManagement: React.FC = () => {
     });
 
     // Reset form
+    const todayStr = new Date().toISOString().split('T')[0];
+    setStartDate(todayStr);
+    setEndDate(todayStr);
     setReason('');
     setIsHalfDay(false);
     setIsSubmitting(false);
@@ -189,58 +277,86 @@ export const LeaveManagement: React.FC = () => {
       {/* Leave Balances Strip (Always visible for active employee persona) */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
+        {/* Paid Annual Leave */}
+        <div className={`p-4 rounded-2xl border shadow-2xs transition-all ${
+          paidRemaining <= 0 ? 'bg-slate-50 border-slate-200' : 'bg-white border-slate-200/80'
+        }`}>
           <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
             <span className="font-semibold text-slate-700">Paid Annual Leave</span>
-            <span className="text-purple-600 font-bold">{currentUser.leaveBalance.paidLeave.remaining} remaining</span>
+            {paidRemaining <= 0 ? (
+              <span className="text-rose-600 font-bold flex items-center gap-1 bg-rose-50 px-1.5 py-0.5 rounded text-[10px]">
+                <Lock className="w-2.5 h-2.5" /> Locked (0 left)
+              </span>
+            ) : (
+              <span className="text-purple-600 font-bold">{paidRemaining} remaining</span>
+            )}
           </div>
           <div className="text-2xl font-bold text-slate-900 font-display">
-            {currentUser.leaveBalance.paidLeave.remaining} <span className="text-xs text-slate-400 font-normal">/ {currentUser.leaveBalance.paidLeave.total}</span>
+            {paidRemaining} <span className="text-xs text-slate-400 font-normal">/ {currentUser.leaveBalance.paidLeave.total}</span>
           </div>
           <div className="w-full bg-slate-100 h-2 rounded-full mt-2 overflow-hidden">
             <div
-              className="bg-purple-600 h-full rounded-full"
-              style={{ width: `${(currentUser.leaveBalance.paidLeave.remaining / currentUser.leaveBalance.paidLeave.total) * 100}%` }}
+              className={`h-full rounded-full ${paidRemaining <= 0 ? 'bg-slate-300' : 'bg-purple-600'}`}
+              style={{ width: `${(paidRemaining / currentUser.leaveBalance.paidLeave.total) * 100}%` }}
             />
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
+        {/* Sick Leave */}
+        <div className={`p-4 rounded-2xl border shadow-2xs transition-all ${
+          sickRemaining <= 0 ? 'bg-slate-50 border-slate-200' : 'bg-white border-slate-200/80'
+        }`}>
           <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
             <span className="font-semibold text-slate-700">Sick Leave</span>
-            <span className="text-emerald-600 font-bold">{currentUser.leaveBalance.sickLeave.remaining} remaining</span>
+            {sickRemaining <= 0 ? (
+              <span className="text-rose-600 font-bold flex items-center gap-1 bg-rose-50 px-1.5 py-0.5 rounded text-[10px]">
+                <Lock className="w-2.5 h-2.5" /> Locked (0 left)
+              </span>
+            ) : (
+              <span className="text-emerald-600 font-bold">{sickRemaining} remaining</span>
+            )}
           </div>
           <div className="text-2xl font-bold text-slate-900 font-display">
-            {currentUser.leaveBalance.sickLeave.remaining} <span className="text-xs text-slate-400 font-normal">/ {currentUser.leaveBalance.sickLeave.total}</span>
+            {sickRemaining} <span className="text-xs text-slate-400 font-normal">/ {currentUser.leaveBalance.sickLeave.total}</span>
           </div>
           <div className="w-full bg-slate-100 h-2 rounded-full mt-2 overflow-hidden">
             <div
-              className="bg-emerald-500 h-full rounded-full"
-              style={{ width: `${(currentUser.leaveBalance.sickLeave.remaining / currentUser.leaveBalance.sickLeave.total) * 100}%` }}
+              className={`h-full rounded-full ${sickRemaining <= 0 ? 'bg-slate-300' : 'bg-emerald-500'}`}
+              style={{ width: `${(sickRemaining / currentUser.leaveBalance.sickLeave.total) * 100}%` }}
             />
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
+        {/* Casual Leave */}
+        <div className={`p-4 rounded-2xl border shadow-2xs transition-all ${
+          casualRemaining <= 0 ? 'bg-slate-50 border-slate-200' : 'bg-white border-slate-200/80'
+        }`}>
           <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
             <span className="font-semibold text-slate-700">Casual / Floating</span>
-            <span className="text-indigo-600 font-bold">{currentUser.leaveBalance.casualLeave.remaining} remaining</span>
+            {casualRemaining <= 0 ? (
+              <span className="text-rose-600 font-bold flex items-center gap-1 bg-rose-50 px-1.5 py-0.5 rounded text-[10px]">
+                <Lock className="w-2.5 h-2.5" /> Locked (0 left)
+              </span>
+            ) : (
+              <span className="text-indigo-600 font-bold">{casualRemaining} remaining</span>
+            )}
           </div>
           <div className="text-2xl font-bold text-slate-900 font-display">
-            {currentUser.leaveBalance.casualLeave.remaining} <span className="text-xs text-slate-400 font-normal">/ {currentUser.leaveBalance.casualLeave.total}</span>
+            {casualRemaining} <span className="text-xs text-slate-400 font-normal">/ {currentUser.leaveBalance.casualLeave.total}</span>
           </div>
           <div className="w-full bg-slate-100 h-2 rounded-full mt-2 overflow-hidden">
             <div
-              className="bg-indigo-500 h-full rounded-full"
-              style={{ width: `${(currentUser.leaveBalance.casualLeave.remaining / currentUser.leaveBalance.casualLeave.total) * 100}%` }}
+              className={`h-full rounded-full ${casualRemaining <= 0 ? 'bg-slate-300' : 'bg-indigo-500'}`}
+              style={{ width: `${(casualRemaining / currentUser.leaveBalance.casualLeave.total) * 100}%` }}
             />
           </div>
         </div>
 
+        {/* Unpaid Leave */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
           <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
             <span className="font-semibold text-slate-700">Unpaid Leave</span>
-            <span className="text-slate-500 font-bold">{currentUser.leaveBalance.unpaidLeave.used} used</span>
+            <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded text-[10px]">Always Allowed</span>
           </div>
           <div className="text-2xl font-bold text-slate-900 font-display">
             {currentUser.leaveBalance.unpaidLeave.used} <span className="text-xs text-slate-400 font-normal">days logged</span>
@@ -269,6 +385,17 @@ export const LeaveManagement: React.FC = () => {
             Submit a leave request. Requests are forwarded directly to HR / Admin.
           </p>
 
+          {/* Quota Exhausted Notice if all paid/sick/casual are 0 */}
+          {allPaidExhausted && (
+            <div className="mb-4 p-3 bg-amber-50 rounded-xl border border-amber-200/80 flex items-start gap-2.5 text-xs text-amber-900">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <strong className="font-bold block">Paid Quotas Exhausted</strong>
+                <span>All paid, sick, and casual quotas are 0. Paid leave options are locked — you may only apply for <strong>Unpaid Leave</strong>.</span>
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleApplySubmit} className="space-y-3.5">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -279,12 +406,35 @@ export const LeaveManagement: React.FC = () => {
                 onChange={(e) => setLeaveType(e.target.value as LeaveType)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-medium text-slate-800 focus:border-purple-600 outline-none"
               >
-                <option value="Paid">Paid Leave (Annual)</option>
-                <option value="Sick">Sick Leave</option>
-                <option value="Casual">Casual / Personal Leave</option>
-                <option value="Unpaid">Unpaid Leave (Loss of Pay)</option>
-                <option value="Maternity/Paternity">Maternity / Paternity Leave</option>
+                <option value="Paid" disabled={paidRemaining <= 0}>
+                  {paidRemaining <= 0 ? '🔒 Paid Leave (Annual) - 0 Remaining (Locked)' : `Paid Leave (Annual) — ${paidRemaining} remaining`}
+                </option>
+                <option value="Sick" disabled={sickRemaining <= 0}>
+                  {sickRemaining <= 0 ? '🔒 Sick Leave - 0 Remaining (Locked)' : `Sick Leave — ${sickRemaining} remaining`}
+                </option>
+                <option value="Casual" disabled={casualRemaining <= 0}>
+                  {casualRemaining <= 0 ? '🔒 Casual / Personal Leave - 0 Remaining (Locked)' : `Casual / Personal Leave — ${casualRemaining} remaining`}
+                </option>
+                <option value="Unpaid">
+                  Unpaid Leave (Loss of Pay) — Available
+                </option>
+                <option value="Maternity/Paternity">
+                  Maternity / Paternity Leave
+                </option>
               </select>
+            </div>
+
+            {/* Half-Day Leave Request (Moved above Start Date & End Date) */}
+            <div className="flex items-center p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+              <label className="text-xs font-semibold text-slate-700 cursor-pointer flex items-center gap-2 select-none w-full">
+                <input
+                  type="checkbox"
+                  checked={isHalfDay}
+                  onChange={(e) => handleHalfDayToggle(e.target.checked)}
+                  className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                />
+                <span>Half-Day Request (0.5 Day)</span>
+              </label>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -295,7 +445,7 @@ export const LeaveManagement: React.FC = () => {
                 <input
                   type="date"
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-purple-600 outline-none"
                   required
                 />
@@ -308,38 +458,24 @@ export const LeaveManagement: React.FC = () => {
                 <input
                   type="date"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  min={startDate}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-purple-600 outline-none"
                   required
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-              <label className="text-xs font-semibold text-slate-700 cursor-pointer flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={isHalfDay}
-                  onChange={(e) => setIsHalfDay(e.target.checked)}
-                  className="w-4 h-4 text-purple-600 rounded"
-                />
-                <span>Half-Day Request (0.5 Day)</span>
-              </label>
-              <span className={`text-xs font-bold ${exceedsBalance ? 'text-rose-600' : 'text-purple-700'}`}>
-                Total: {totalDays} {totalDays === 1 ? 'day' : 'days'}
+            {/* Separate Total Duration Display Bar */}
+            <div className="flex items-center justify-between p-2.5 bg-purple-50/80 rounded-xl border border-purple-100">
+              <span className="text-xs font-semibold text-purple-900 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-purple-600" />
+                Total Duration
+              </span>
+              <span className="text-xs font-bold text-purple-700 bg-white px-2.5 py-0.5 rounded-lg border border-purple-200/80 shadow-2xs">
+                {totalDays} {totalDays === 1 ? 'day' : 'days'}
               </span>
             </div>
-
-            {exceedsBalance && (
-              <div className="flex items-start gap-1.5 p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-[11px] text-rose-700 font-medium">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                <span>
-                  {remainingForSelectedType === 0
-                    ? `You have no ${leaveType} leave remaining.`
-                    : `Only ${remainingForSelectedType} day(s) of ${leaveType} leave remaining.`}
-                </span>
-              </div>
-            )}
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -357,8 +493,8 @@ export const LeaveManagement: React.FC = () => {
 
             <button
               type="submit"
-              disabled={isSubmitting || exceedsBalance}
-              className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-md shadow-purple-600/25 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-purple-600"
+              disabled={isSubmitting}
+              className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-md shadow-purple-600/25 flex items-center justify-center gap-2 transition-all"
             >
               <Send className="w-3.5 h-3.5" />
               <span>Submit Leave Application</span>

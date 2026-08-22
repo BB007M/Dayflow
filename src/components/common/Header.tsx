@@ -29,7 +29,8 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { 
     currentUser, 
-    currentRole,  
+    currentRole, 
+    switchRole, 
     employees, 
     checkInState, 
     openEmployeeProfile, 
@@ -41,8 +42,8 @@ export const Header: React.FC<HeaderProps> = ({
     setIsNotificationOpen,
     openAuditDrawer,
     isDbConnected,
-    isDarkMode,
-    toggleDarkMode
+    theme,
+    toggleTheme
   } = useHR();
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -101,7 +102,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 px-4 lg:px-6 py-3 transition-colors">
+    <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 px-4 lg:px-6 py-3 transition-colors duration-200">
       <div className="flex items-center justify-between gap-3 max-w-7xl mx-auto">
         
         {/* Left: Mobile menu toggle + Logo / Tagline */}
@@ -126,7 +127,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white font-display">
                   dayflow
                 </span>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-700/50">
+                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60">
                   HRMS
                 </span>
               </div>
@@ -147,12 +148,12 @@ export const Header: React.FC<HeaderProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => searchQuery.trim() && setIsSearchOpen(true)}
-              className="w-full pl-9 pr-4 py-2 text-xs md:text-sm bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 rounded-xl border border-transparent focus:border-purple-400 dark:focus:border-purple-500 focus:ring-2 focus:ring-purple-100 dark:focus:ring-purple-950/40 outline-none transition-all"
+              className="w-full pl-9 pr-4 py-2 text-xs md:text-sm bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 rounded-xl border border-transparent focus:border-purple-400 dark:focus:border-purple-500 focus:ring-2 focus:ring-purple-100 dark:focus:ring-purple-950 outline-none transition-all"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-xs absolute right-3 top-1/2 -translate-y-1/2"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs absolute right-3 top-1/2 -translate-y-1/2"
               >
                 Clear
               </button>
@@ -161,7 +162,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Search Dropdown */}
           {isSearchOpen && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-2 z-50 max-h-72 overflow-y-auto">
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-50 max-h-72 overflow-y-auto">
               {searchResults.length === 0 ? (
                 <div className="p-4 text-center text-xs text-slate-500 dark:text-slate-400">
                   No matching employees found for "{searchQuery}"
@@ -171,7 +172,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     key={emp.id}
                     onClick={() => handleSelectSearchResult(emp)}
-                    className="w-full flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 rounded-lg text-left transition-colors"
+                    className="w-full flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800/80 rounded-lg text-left transition-colors"
                   >
                     <img
                       src={emp.avatar}
@@ -179,9 +180,9 @@ export const Header: React.FC<HeaderProps> = ({
                       className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700"
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
+                      <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">
                         {emp.firstName} {emp.lastName}
-                        <span className="ml-1.5 text-[10px] text-slate-400 dark:text-slate-500">({emp.employeeId})</span>
+                        <span className="ml-1.5 text-[10px] text-slate-400">({emp.employeeId})</span>
                       </div>
                       <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                         {emp.jobDetails.designation} • {emp.jobDetails.department}
@@ -194,42 +195,42 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        {/* Right: Dark Mode Toggle, DB Logs, Punch Status, Notifications & Profile */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        {/* Right: DB Logs, Punch Status, Theme Toggle, Notifications & Profile */}
+        <div className="flex items-center gap-2 sm:gap-2.5">
           
-          {/* Dark Mode Toggle Button */}
-          <button
-            onClick={toggleDarkMode}
-            className="flex items-center justify-center w-9 h-9 text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-950/50 hover:text-purple-700 dark:hover:text-purple-300 rounded-xl border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-xs"
-            title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            aria-label={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-          >
-            {isDarkMode ? (
-              <Sun className="w-4 h-4 text-amber-400 animate-in spin-in-180 duration-300" />
-            ) : (
-              <Moon className="w-4 h-4 text-indigo-600 animate-in spin-in-180 duration-300" />
-            )}
-          </button>
-
-          {/* PostgreSQL DB Auth Logs Button */}
+          {/* Supabase DB Auth Logs Button */}
           <button
             onClick={openAuditDrawer}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-950/50 hover:text-purple-700 dark:hover:text-purple-300 rounded-xl border border-slate-200 dark:border-slate-700 transition-all"
-            title="View PostgreSQL / Supabase Login Logs"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-slate-700 hover:text-purple-700 dark:hover:text-purple-300 rounded-xl border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
+            title="View Supabase Login & Audit Logs"
           >
             <Database className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
             <span className="hidden sm:inline">DB Logs</span>
+          </button>
+
+          {/* Theme Toggle Button (Light / Dark Mode) */}
+          <button
+            onClick={toggleTheme}
+            className="p-2 text-slate-600 dark:text-slate-300 hover:text-purple-600 dark:hover:text-amber-400 bg-slate-100/80 dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-700/80 rounded-xl border border-slate-200 dark:border-slate-700 transition-all cursor-pointer group"
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            aria-label={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          >
+            {theme === 'dark' ? (
+              <Sun className="w-4 h-4 text-amber-400 transition-transform group-hover:rotate-45" />
+            ) : (
+              <Moon className="w-4 h-4 text-slate-600 group-hover:text-purple-600 transition-transform group-hover:-rotate-12" />
+            )}
           </button>
 
           {/* Real-time Punch Status pill */}
           {currentUser && (
             <div 
               onClick={() => setActiveTab('attendance')}
-              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 cursor-pointer border border-slate-200/60 dark:border-slate-700 transition-colors text-xs"
+              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700 cursor-pointer border border-slate-200/60 dark:border-slate-700 transition-colors text-xs"
               title="Click to view full attendance logs"
             >
-              <div className={`w-2 h-2 rounded-full ${checkInState.isCheckedIn ? (checkInState.isOnBreak ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500 animate-pulse') : 'bg-slate-400 dark:bg-slate-600'}`} />
-              <span className="font-medium text-slate-700 dark:text-slate-200">
+              <div className={`w-2 h-2 rounded-full ${checkInState.isCheckedIn ? (checkInState.isOnBreak ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500 animate-pulse') : 'bg-slate-400'}`} />
+              <span className="font-medium text-slate-700 dark:text-slate-300">
                 {checkInState.isCheckedIn
                   ? checkInState.isOnBreak
                     ? 'On Break'
@@ -237,7 +238,7 @@ export const Header: React.FC<HeaderProps> = ({
                   : 'Punched Out'}
               </span>
               {checkInState.isCheckedIn && (
-                <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 px-1.5 py-0.5 rounded">
+                <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/70 px-1.5 py-0.5 rounded">
                   {formatSeconds(checkInState.accumulatedWorkedSeconds)}
                 </span>
               )}
@@ -247,7 +248,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Notifications Button */}
           <button
             onClick={() => setIsNotificationOpen(true)}
-            className="relative p-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+            className="relative p-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
             aria-label="View notifications"
           >
             <Bell className="w-5 h-5" />
@@ -263,7 +264,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div ref={menuRef} className="relative">
               <button
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+                className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700 cursor-pointer"
               >
                 <img
                   src={currentUser.avatar}
@@ -283,10 +284,10 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* User Dropdown Menu */}
               {isUserMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-2 z-50 text-xs">
+                <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-50 text-xs">
                   {/* Active user header */}
-                  <div className="p-3 bg-slate-50 dark:bg-slate-900/80 rounded-xl mb-2 border border-slate-100 dark:border-slate-700/60">
-                    <div className="font-semibold text-slate-900 dark:text-slate-100 text-sm">
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-xl mb-2 border border-slate-100 dark:border-slate-700">
+                    <div className="font-semibold text-slate-900 dark:text-white text-sm">
                       {currentUser.firstName} {currentUser.lastName}
                     </div>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
@@ -297,33 +298,13 @@ export const Header: React.FC<HeaderProps> = ({
                         <ShieldCheck className="w-3 h-3" />
                         {currentRole === 'admin' ? 'Admin / HR' : 'Employee'}
                       </span>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                      <span className="text-[10px] text-slate-400 font-mono">
                         {currentUser.employeeId}
                       </span>
                     </div>
                   </div>
 
-                  <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
-
-                  {/* Dark Mode Quick Toggle inside menu */}
-                  <button
-                    onClick={toggleDarkMode}
-                    className="w-full flex items-center justify-between px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 rounded-lg transition-colors text-left"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      {isDarkMode ? (
-                        <Sun className="w-4 h-4 text-amber-400" />
-                      ) : (
-                        <Moon className="w-4 h-4 text-indigo-500" />
-                      )}
-                      <span>Theme: {isDarkMode ? 'Dark' : 'Light'}</span>
-                    </div>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 font-semibold text-slate-500 dark:text-slate-300">
-                      Toggle
-                    </span>
-                  </button>
-
-                  <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
+                  <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
 
                   {/* Actions */}
                   <button
@@ -331,7 +312,7 @@ export const Header: React.FC<HeaderProps> = ({
                       openEmployeeProfile(currentUser);
                       setIsUserMenuOpen(false);
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 rounded-lg transition-colors text-left"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors text-left cursor-pointer"
                   >
                     <User className="w-4 h-4 text-slate-400" />
                     View & Edit My Profile
@@ -342,7 +323,7 @@ export const Header: React.FC<HeaderProps> = ({
                       setActiveTab('attendance');
                       setIsUserMenuOpen(false);
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 rounded-lg transition-colors text-left"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors text-left cursor-pointer"
                   >
                     <Clock className="w-4 h-4 text-slate-400" />
                     Attendance & Punch Logs
@@ -353,34 +334,43 @@ export const Header: React.FC<HeaderProps> = ({
                       setActiveTab('payroll');
                       setIsUserMenuOpen(false);
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 rounded-lg transition-colors text-left"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors text-left cursor-pointer"
                   >
                     <Briefcase className="w-4 h-4 text-slate-400" />
                     Salary & Payslips
                   </button>
 
-                  <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
-
+                  {/* Dark Mode switch inside user menu too for extra convenience */}
                   <button
                     onClick={() => {
-                      setIsUserMenuOpen(false);
-                      openAuthModal('signin');
+                      toggleTheme();
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-purple-700 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 rounded-lg transition-colors text-left font-medium"
+                    className="w-full flex items-center justify-between px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors text-left cursor-pointer"
                   >
-                    <User className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                    Switch / Sign In Account
+                    <div className="flex items-center gap-2.5">
+                      {theme === 'dark' ? (
+                        <Sun className="w-4 h-4 text-amber-400" />
+                      ) : (
+                        <Moon className="w-4 h-4 text-slate-400" />
+                      )}
+                      <span>Appearance</span>
+                    </div>
+                    <span className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 uppercase">
+                      {theme === 'dark' ? 'Dark' : 'Light'}
+                    </span>
                   </button>
+
+                  <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
 
                   <button
                     onClick={() => {
                       setIsUserMenuOpen(false);
                       signOut();
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors text-left font-semibold"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors text-left font-semibold cursor-pointer"
                   >
                     <LogOut className="w-4 h-4 text-rose-500" />
-                    Sign Out (Terminate Session)
+                    Sign Out (Logout)
                   </button>
                 </div>
               )}
@@ -388,10 +378,22 @@ export const Header: React.FC<HeaderProps> = ({
           ) : (
             <button
               onClick={() => openAuthModal('signin')}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-md shadow-purple-600/20 transition-all"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-md shadow-purple-600/20 transition-all cursor-pointer"
             >
               <LogIn className="w-4 h-4" />
               <span>Sign In</span>
+            </button>
+          )}
+
+          {/* Dedicated Direct Logout Button */}
+          {currentUser && (
+            <button
+              onClick={() => signOut()}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 rounded-xl border border-rose-200 dark:border-rose-900/60 transition-all shadow-sm cursor-pointer"
+              title="Sign Out of Session"
+            >
+              <LogOut className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+              <span className="hidden sm:inline">Logout</span>
             </button>
           )}
 

@@ -30,12 +30,13 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ isOpen, 
 
   if (!isOpen) return null;
 
-  // Filter notifications relevant to current persona
+  // Filter notifications relevant to current persona:
+  // Admins see all administrative, system, and workflow notifications
+  // Employees ONLY see notifications specifically related to them (targeted to their employeeId)
   const userNotifications = notifications.filter((n) => {
-    if (n.targetRole === 'all') return true;
-    if (n.targetRole === currentRole) return true;
-    if (n.targetEmployeeId && n.targetEmployeeId === currentUser.employeeId) return true;
-    return false;
+    if (!currentUser) return false;
+    if (currentRole === 'admin') return true;
+    return n.targetEmployeeId === currentUser.employeeId;
   });
 
   const getIcon = (type: string) => {
@@ -73,24 +74,24 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ isOpen, 
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="w-screen max-w-md bg-white dark:bg-slate-900 shadow-2xl flex flex-col border-l border-slate-200 dark:border-slate-800"
+          className="w-screen max-w-md bg-white shadow-2xl flex flex-col border-l border-slate-200"
         >
           {/* Header */}
-          <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-850">
+          <div className="p-4 sm:p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center">
                 <Bell className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white font-display">Notifications</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Alerts, leave approvals & payroll</p>
+                <h3 className="text-base font-bold text-slate-900 font-display">Notifications</h3>
+                <p className="text-xs text-slate-500">Alerts, leave approvals & payroll</p>
               </div>
             </div>
 
             <div className="flex items-center gap-1">
               <button
                 onClick={markAllNotificationsRead}
-                className="p-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/50 rounded-lg font-medium flex items-center gap-1 transition-colors"
+                className="p-1.5 text-xs text-slate-500 hover:text-purple-700 hover:bg-purple-50 rounded-lg font-medium flex items-center gap-1 transition-colors"
                 title="Mark all as read"
               >
                 <CheckCheck className="w-4 h-4" />
@@ -98,7 +99,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ isOpen, 
               </button>
               <button
                 onClick={onClose}
-                className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -108,10 +109,10 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ isOpen, 
           {/* List */}
           <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
             {userNotifications.length === 0 ? (
-              <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-slate-400 dark:text-slate-500">
-                <Bell className="w-10 h-10 stroke-1 mb-2 opacity-60 text-slate-300 dark:text-slate-600" />
-                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">No new notifications</p>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">You're completely caught up with HR activities.</p>
+              <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-slate-400">
+                <Bell className="w-10 h-10 stroke-1 mb-2 opacity-60 text-slate-300" />
+                <p className="text-sm font-semibold text-slate-600">No new notifications</p>
+                <p className="text-xs text-slate-400 mt-1">You're completely caught up with HR activities.</p>
               </div>
             ) : (
               userNotifications.map((notif) => (
@@ -120,32 +121,32 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ isOpen, 
                   onClick={() => handleClickItem(notif)}
                   className={`p-3.5 rounded-xl border transition-all cursor-pointer flex gap-3 items-start group ${
                     notif.isRead
-                      ? 'bg-white dark:bg-slate-800/80 border-slate-200/80 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600'
-                      : 'bg-purple-50/50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800/60 hover:bg-purple-50 dark:hover:bg-purple-950/50 shadow-xs'
+                      ? 'bg-white border-slate-200/80 hover:border-slate-300'
+                      : 'bg-purple-50/50 border-purple-200 hover:bg-purple-50 shadow-xs'
                   }`}
                 >
-                  <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${notif.isRead ? 'bg-slate-100 dark:bg-slate-700' : 'bg-purple-100 dark:bg-purple-900/60'}`}>
+                  <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${notif.isRead ? 'bg-slate-100' : 'bg-purple-100'}`}>
                     {getIcon(notif.type)}
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <h4 className={`text-xs font-semibold truncate ${notif.isRead ? 'text-slate-800 dark:text-slate-200' : 'text-purple-950 dark:text-purple-200 font-bold'}`}>
+                      <h4 className={`text-xs font-semibold truncate ${notif.isRead ? 'text-slate-800' : 'text-purple-950 font-bold'}`}>
                         {notif.title}
                       </h4>
                       {!notif.isRead && (
-                        <span className="w-2 h-2 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
+                        <span className="w-2 h-2 rounded-full bg-purple-600 shrink-0" />
                       )}
                     </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                       {notif.message}
                     </p>
-                    <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-100/80 dark:border-slate-700/60">
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                    <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-100/80">
+                      <span className="text-[10px] text-slate-400">
                         {notif.timestamp}
                       </span>
                       {notif.linkTab && (
-                        <span className="text-[10px] font-semibold text-purple-700 dark:text-purple-300 flex items-center group-hover:translate-x-0.5 transition-transform">
+                        <span className="text-[10px] font-semibold text-purple-700 flex items-center group-hover:translate-x-0.5 transition-transform">
                           View details <ChevronRight className="w-3 h-3" />
                         </span>
                       )}
@@ -157,8 +158,8 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ isOpen, 
           </div>
 
           {/* Footer */}
-          <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850 text-center">
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+          <div className="p-4 border-t border-slate-200 bg-slate-50 text-center">
+            <p className="text-xs text-slate-500">
               System alerts adhere to Dayflow HRMS security policies.
             </p>
           </div>

@@ -1,105 +1,73 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useHR } from '../../context/HRContext';
-import {
-  Employee,
-  Department,
-  EmploymentType,
-  WorkLocation,
-} from '../../types';
-import {
-  X,
-  User,
-  Briefcase,
-  Banknote,
-  FileText,
-  Edit3,
-  Save,
-  Upload,
-  Lock,
+import { Employee, Department, EmploymentType, WorkLocation } from '../../types';
+import { 
+  X, 
+  User, 
+  Briefcase, 
+  Banknote, 
+  FileText, 
+  Edit3, 
+  Save, 
+  Upload, 
+  Lock, 
+  Phone, 
+  MapPin, 
+  AlertCircle,
+  FileCheck,
   Download,
+  RotateCcw,
+  Flame,
+  UserX,
+  AlertTriangle,
+  ShieldAlert
 } from 'lucide-react';
 
-type Tab = 'personal' | 'job' | 'salary' | 'documents';
-
 export const EmployeeProfileModal: React.FC = () => {
-  const {
-    selectedEmployeeForModal,
-    isProfileModalOpen,
-    closeEmployeeProfile,
-    updateEmployee,
-    currentRole,
+  const { 
+    selectedEmployeeForModal, 
+    isProfileModalOpen, 
+    closeEmployeeProfile, 
+    updateEmployee, 
+    terminateEmployee,
+    rehireEmployee,
+    currentRole, 
     currentUser,
-    addToast,
+    addToast
   } = useHR();
 
-  const [activeTab, setActiveTab] = useState<Tab>('personal');
+  const [activeTab, setActiveTab] = useState<'personal' | 'job' | 'salary' | 'documents'>('personal');
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState<Employee | null>(
-    selectedEmployeeForModal
-  );
+  
+  // Editable form state initialized from selected employee
+  const [formData, setFormData] = useState<Employee | null>(selectedEmployeeForModal);
 
-  useEffect(() => {
+  // Termination Confirmation inside Modal
+  const [showFireConfirm, setShowFireConfirm] = useState(false);
+  const [fireReason, setFireReason] = useState('Performance Discrepancy');
+  const [fireNotes, setFireNotes] = useState('');
+  const [isProcessingTermination, setIsProcessingTermination] = useState(false);
+
+  // Sync state if selectedEmployeeForModal changes
+  React.useEffect(() => {
     setFormData(selectedEmployeeForModal);
-    setActiveTab('personal');
     setIsEditing(false);
+    setShowFireConfirm(false);
   }, [selectedEmployeeForModal]);
 
   if (!isProfileModalOpen || !formData) return null;
 
   const isAdmin = currentRole === 'admin';
-  const isOwner = currentUser?.id === formData.id;
-  const canEditPersonal = isAdmin || isOwner;
-  const canEditJob = isAdmin;
-  const canEditSalary = isAdmin;
-  const canUploadDocuments = isAdmin || isOwner;
+  const isOwner = currentUser ? currentUser.id === formData.id : false;
+  const canEdit = isAdmin || isOwner;
+  const isTerminated = formData.status === 'Terminated';
 
-  const fieldClass = (editable: boolean) =>
-    `w-full px-3 py-2 text-xs rounded-xl border outline-none transition-colors ${
-      editable
-        ? 'border-purple-400 dark:border-purple-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 ring-1 ring-purple-200 dark:ring-purple-900'
-        : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 text-slate-700 dark:text-slate-400'
-    }`;
-
-  const moneyFieldClass = (editable: boolean) =>
-    `w-full px-3 py-1.5 text-xs rounded-lg border outline-none transition-colors ${
-      editable
-        ? 'border-purple-400 dark:border-purple-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 ring-1 ring-purple-200 dark:ring-purple-900'
-        : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900/60 text-slate-700 dark:text-slate-400'
-    }`;
-
-  const setPersonal = (changes: Partial<Employee['personalDetails']>) => {
-    setFormData({
-      ...formData,
-      personalDetails: {
-        ...formData.personalDetails,
-        ...changes,
-      },
-    });
-  };
-
-  const setJob = (changes: Partial<Employee['jobDetails']>) => {
-    setFormData({
-      ...formData,
-      jobDetails: {
-        ...formData.jobDetails,
-        ...changes,
-      },
-    });
-  };
-
-  const setSalary = (changes: Partial<Employee['salaryStructure']>) => {
-    setFormData({
-      ...formData,
-      salaryStructure: {
-        ...formData.salaryStructure,
-        ...changes,
-      },
-    });
-  };
-
-  const handleSave = async () => {
-    await updateEmployee(formData);
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData) return;
+    updateEmployee(formData);
     setIsEditing(false);
+    addToast('success', 'Profile Updated', `Changes to ${formData.firstName} ${formData.lastName}'s profile saved.`);
   };
 
   const handleCancel = () => {
@@ -107,13 +75,34 @@ export const EmployeeProfileModal: React.FC = () => {
     setIsEditing(false);
   };
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleExecuteFire = async () => {
+    if (!formData) return;
+    setIsProcessingTermination(true);
+    try {
+      await terminateEmployee(formData.id, fireReason, fireNotes);
+      setFormData((prev) => (prev ? { ...prev, status: 'Terminated' } : null));
+      setShowFireConfirm(false);
+    } finally {
+      setIsProcessingTermination(false);
+    }
+  };
+
+  const handleExecuteRehire = async () => {
+    if (!formData) return;
+    setIsProcessingTermination(true);
+    try {
+      await rehireEmployee(formData.id);
+      setFormData((prev) => (prev ? { ...prev, status: 'Active' } : null));
+    } finally {
+      setIsProcessingTermination(false);
+    }
+  };
+
+  const handleAddDocument = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !canUploadDocuments) return;
+    if (!file || !formData) return;
 
-    const url = URL.createObjectURL(file);
-
-    const doc = {
+    const newDoc = {
       id: `doc-${Date.now()}`,
       name: file.name,
       type: file.type.includes('pdf') ? 'PDF' : 'Document',
@@ -124,285 +113,451 @@ export const EmployeeProfileModal: React.FC = () => {
 
     const updated = {
       ...formData,
-      avatar: file.type.startsWith('image/') ? url : formData.avatar,
-      documents: [doc, ...(formData.documents || [])],
+      documents: [newDoc, ...formData.documents],
     };
-
     setFormData(updated);
-    addToast('success', 'File Added', `${file.name} was attached to the profile.`);
+    updateEmployee(updated);
+    addToast('success', 'Document Attached', `${file.name} uploaded to profile.`);
   };
 
-  const gross =
-    formData.salaryStructure.basicSalary +
-    formData.salaryStructure.hra +
-    formData.salaryStructure.conveyanceAllowance +
-    formData.salaryStructure.medicalAllowance +
-    formData.salaryStructure.specialAllowance;
-
-  const net =
-    gross -
-    formData.salaryStructure.providentFund -
-    formData.salaryStructure.incomeTax -
-    formData.salaryStructure.professionalTax;
-
-  const salaryNumber = (
-    key: keyof Employee['salaryStructure'],
-    value: string
-  ) => {
-    const cleaned = value.replace(/[^0-9.]/g, '');
-    const numeric = cleaned === '' ? 0 : Number(cleaned);
-    setSalary({ [key]: Number.isFinite(numeric) ? numeric : 0 });
+  const getStatusPill = (status: Employee['status']) => {
+    switch (status) {
+      case 'Active':
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+            Active
+          </span>
+        );
+      case 'Terminated':
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/30 text-rose-200 border border-rose-400/50 flex items-center gap-1">
+            <UserX className="w-3 h-3 text-rose-300" />
+            Terminated
+          </span>
+        );
+      case 'On Leave':
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40">
+            On Leave
+          </span>
+        );
+      case 'Probation':
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+            Probation
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white">
+            {status}
+          </span>
+        );
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-3xl w-full overflow-hidden my-6 max-h-[92vh] flex flex-col">
+    <div 
+      id="employee-profile-modal-backdrop"
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4"
+    >
+      <div 
+        id="employee-profile-modal-container"
+        className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-3xl w-full overflow-hidden transition-all my-6 max-h-[92vh] flex flex-col relative"
+      >
+        
+        {/* Modal Header */}
+        <div className={`p-6 text-white relative shrink-0 ${
+          isTerminated 
+            ? 'bg-gradient-to-r from-rose-950 via-rose-900 to-slate-950' 
+            : 'bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900'
+        }`}>
+          
+          {/* Top-Right Control Bar */}
+          <div className="absolute right-4 top-4 flex items-center gap-2 z-10">
+            {canEdit && (
+              !isEditing ? (
+                <button
+                  type="button"
+                  id="profile-edit-toggle-btn"
+                  onClick={() => setIsEditing(true)}
+                  className="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold backdrop-blur-md border border-white/20 flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Edit Profile</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    id="profile-cancel-edit-btn"
+                    onClick={handleCancel}
+                    className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white/90 text-xs font-semibold backdrop-blur-md border border-white/20 transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    id="profile-save-changes-btn"
+                    onClick={handleSave}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold shadow-md flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Save</span>
+                  </button>
+                </div>
+              )
+            )}
 
-        {/* Header */}
-        <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 p-6 text-white relative shrink-0">
-          <button
-            type="button"
-            onClick={closeEmployeeProfile}
-            aria-label="Close profile"
-            className="absolute right-3 top-3 z-30 w-9 h-9 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+            <button
+              type="button"
+              id="profile-close-btn"
+              onClick={closeEmployeeProfile}
+              className="p-1.5 rounded-xl text-white/80 hover:text-white bg-white/10 hover:bg-white/20 border border-white/10 transition-colors cursor-pointer"
+              aria-label="Close profile modal"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
 
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 pr-12">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 pr-0 sm:pr-36">
             <div className="relative group shrink-0">
               <img
                 src={formData.avatar}
-                alt={`${formData.firstName} ${formData.lastName}`}
-                onError={(e) => {
-                  e.currentTarget.onerror = null;
-                  e.currentTarget.src = '';
-                }}
-                className="w-20 h-20 rounded-2xl object-cover ring-4 ring-white/20 shadow-lg bg-purple-800"
+                alt={formData.firstName}
+                className={`w-20 h-20 rounded-2xl object-cover ring-4 shadow-lg ${
+                  isTerminated ? 'ring-rose-400/40 grayscale-40' : 'ring-white/20'
+                }`}
               />
-
-              {isEditing && canEditPersonal && (
-                <label className="absolute inset-0 bg-black/60 rounded-2xl flex flex-col items-center justify-center cursor-pointer text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity">
+              {isEditing && (
+                <label className="absolute inset-0 bg-black/60 rounded-2xl flex flex-col items-center justify-center cursor-pointer text-[10px] text-white opacity-90 group-hover:opacity-100 transition-opacity">
                   <Upload className="w-4 h-4 mb-0.5" />
                   <span>Change</span>
                   <input
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={handleUpload}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const url = URL.createObjectURL(file);
+                        setFormData({ ...formData, avatar: url });
+                      }
+                    }}
                   />
                 </label>
               )}
             </div>
 
-            <div className="flex-1 min-w-0 text-center sm:text-left">
+            <div className="text-center sm:text-left flex-1 min-w-0">
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                <h2 className="text-xl font-bold text-white">
+                <h2 className={`text-xl font-bold font-display tracking-tight text-white truncate ${
+                  isTerminated ? 'line-through text-slate-300' : ''
+                }`}>
                   {formData.firstName} {formData.lastName}
                 </h2>
-
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/20 text-purple-200">
                   {formData.employeeId}
                 </span>
-
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  {formData.status}
-                </span>
+                {getStatusPill(formData.status)}
               </div>
-
               <p className="text-xs text-purple-200 mt-1">
                 {formData.jobDetails.designation} • {formData.jobDetails.department}
               </p>
-
-              <p className="text-[11px] text-slate-300 mt-0.5">
-                Joined {formData.jobDetails.dateOfJoining || '—'} •{' '}
-                {formData.jobDetails.workLocation} ({formData.jobDetails.employmentType})
+              <p className="text-[11px] text-slate-300 mt-0.5 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                <span>Joined {formData.jobDetails.dateOfJoining}</span>
+                <span>•</span>
+                <span>{formData.jobDetails.workLocation} ({formData.jobDetails.employmentType})</span>
               </p>
             </div>
-
-            {canEditPersonal && !isEditing && (
-              <button
-                type="button"
-                onClick={() => setIsEditing(true)}
-                className="shrink-0 px-3.5 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold border border-white/20 flex items-center gap-1.5"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                Edit Profile
-              </button>
-            )}
-
-            {isEditing && (
-              <div className="shrink-0 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/20"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  className="px-4 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold flex items-center gap-1.5"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  Save
-                </button>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-slate-200 dark:border-slate-800 px-6 bg-slate-100 dark:bg-slate-950 shrink-0 overflow-x-auto">
+        {/* Termination Alert Bar */}
+        {isTerminated && (
+          <div className="bg-rose-50 border-b border-rose-200 px-6 py-3 flex items-center justify-between gap-3 text-xs text-rose-900">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>
+                <strong>Employment Terminated:</strong> This employee is deactivated in Supabase. System login access has been revoked.
+              </span>
+            </div>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={handleExecuteRehire}
+                disabled={isProcessingTermination}
+                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] flex items-center gap-1 shadow-xs transition-colors shrink-0 cursor-pointer disabled:opacity-50"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Rehire Employee</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Tab Navigation */}
+        <div className="flex border-b border-slate-200 px-6 bg-slate-50/80 shrink-0 overflow-x-auto">
           {[
-            { id: 'personal' as Tab, label: 'Personal Details', icon: User },
-            { id: 'job' as Tab, label: 'Job & Employment', icon: Briefcase },
-            { id: 'salary' as Tab, label: 'Salary Structure', icon: Banknote },
-            { id: 'documents' as Tab, label: 'Documents & Files', icon: FileText },
+            { id: 'personal', label: 'Personal Details', icon: User },
+            { id: 'job', label: 'Job & Employment', icon: Briefcase },
+            { id: 'salary', label: 'Salary Structure', icon: Banknote },
+            { id: 'documents', label: 'Documents & Files', icon: FileText },
           ].map((tab) => {
             const Icon = tab.icon;
-            const active = activeTab === tab.id;
-
+            const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-3 px-4 text-xs font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap ${
-                  active
-                    ? 'border-purple-600 dark:border-purple-500 text-purple-700 dark:text-purple-300 bg-white dark:bg-slate-800'
-                    : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                id={`profile-tab-${tab.id}`}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`py-3 px-4 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                  isActive
+                    ? 'border-purple-600 text-purple-700 bg-white shadow-xs'
+                    : 'border-transparent text-slate-500 hover:text-slate-900'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
-                {tab.label}
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-purple-600' : 'text-slate-400'}`} />
+                <span>{tab.label}</span>
               </button>
             );
           })}
         </div>
 
-        {/* Body */}
-        <div className="p-6 overflow-y-auto flex-1 text-slate-900 dark:text-slate-100">
-
-          {/* Personal */}
+        {/* Tab Content Body */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-4">
+          
+          {/* TAB 1: PERSONAL DETAILS */}
           {activeTab === 'personal' && (
             <div className="space-y-4">
-              {!isAdmin && isEditing && isOwner && (
-                <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-purple-900 dark:text-purple-200 text-xs flex gap-2">
-                  <Lock className="w-4 h-4 shrink-0" />
-                  You can edit your personal and emergency contact information. Job and salary information is managed by HR.
-                </div>
-              )}
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold mb-1">First Name</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">First Name</label>
                   <input
+                    type="text"
+                    disabled={!isEditing}
                     value={formData.firstName}
-                    disabled={!canEditPersonal || !isEditing}
                     onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                    className={fieldClass(canEditPersonal && isEditing)}
+                    className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                      isEditing ? 'border-purple-400 bg-white ring-1 ring-purple-100' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                    } outline-none`}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold mb-1">Last Name</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Last Name</label>
                   <input
+                    type="text"
+                    disabled={!isEditing}
                     value={formData.lastName}
-                    disabled={!canEditPersonal || !isEditing}
                     onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                    className={fieldClass(canEditPersonal && isEditing)}
+                    className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                      isEditing ? 'border-purple-400 bg-white ring-1 ring-purple-100' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                    } outline-none`}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold mb-1">Work Email</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Work Email</label>
                   <input
                     type="email"
+                    disabled={!isEditing || !isAdmin}
                     value={formData.email}
-                    disabled={!isAdmin || !isEditing}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className={fieldClass(isAdmin && isEditing)}
+                    className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                      isEditing && isAdmin ? 'border-purple-400 bg-white ring-1 ring-purple-100' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                    } outline-none`}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold mb-1">Phone Number</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
                   <input
-                    value={formData.phone || ''}
-                    disabled={!canEditPersonal || !isEditing}
+                    type="text"
+                    disabled={!isEditing}
+                    value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className={fieldClass(canEditPersonal && isEditing)}
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold mb-1">Residential Address</label>
-                  <input
-                    value={formData.personalDetails.address || ''}
-                    disabled={!canEditPersonal || !isEditing}
-                    onChange={(e) => setPersonal({ address: e.target.value })}
-                    className={fieldClass(canEditPersonal && isEditing)}
+                    className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                      isEditing ? 'border-purple-400 bg-white ring-1 ring-purple-100' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                    } outline-none`}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold mb-1">City / State</label>
-                  <input
-                    value={formData.personalDetails.city || ''}
-                    disabled={!canEditPersonal || !isEditing}
-                    onChange={(e) => setPersonal({ city: e.target.value })}
-                    className={fieldClass(canEditPersonal && isEditing)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold mb-1">Date of Birth</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Date of Birth</label>
                   <input
                     type="date"
-                    value={formData.personalDetails.dob || ''}
-                    disabled={!isAdmin || !isEditing}
-                    onChange={(e) => setPersonal({ dob: e.target.value })}
-                    className={fieldClass(isAdmin && isEditing)}
+                    disabled={!isEditing}
+                    value={formData.personalDetails?.dateOfBirth || ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        personalDetails: { ...formData.personalDetails, dateOfBirth: e.target.value },
+                      })
+                    }
+                    className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                      isEditing ? 'border-purple-400 bg-white ring-1 ring-purple-100' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                    } outline-none`}
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Gender</label>
+                  <select
+                    disabled={!isEditing}
+                    value={formData.personalDetails?.gender || 'Prefer not to say'}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        personalDetails: { ...formData.personalDetails, gender: e.target.value as any },
+                      })
+                    }
+                    className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                      isEditing ? 'border-purple-400 bg-white ring-1 ring-purple-100' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                    } outline-none`}
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
-                <h4 className="text-xs font-bold uppercase tracking-wider mb-3">
-                  Emergency Contact Information
+              {/* Address details */}
+              <div className="pt-3 border-t border-slate-200">
+                <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-purple-600" />
+                  <span>Residential Address</span>
                 </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-3">
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Street Address</label>
+                    <input
+                      type="text"
+                      disabled={!isEditing}
+                      value={formData.personalDetails?.address || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          personalDetails: { ...formData.personalDetails, address: e.target.value },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">City</label>
+                    <input
+                      type="text"
+                      disabled={!isEditing}
+                      value={formData.personalDetails?.city || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          personalDetails: { ...formData.personalDetails, city: e.target.value },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">State / Region</label>
+                    <input
+                      type="text"
+                      disabled={!isEditing}
+                      value={formData.personalDetails?.state || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          personalDetails: { ...formData.personalDetails, state: e.target.value },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Postal Code</label>
+                    <input
+                      type="text"
+                      disabled={!isEditing}
+                      value={formData.personalDetails?.postalCode || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          personalDetails: { ...formData.personalDetails, postalCode: e.target.value },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
 
+              {/* Emergency Contact */}
+              <div className="pt-3 border-t border-slate-200">
+                <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+                  <Phone className="w-4 h-4 text-purple-600" />
+                  <span>Emergency Contact</span>
+                </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[11px] mb-1 text-slate-600 dark:text-slate-400">Contact Name</label>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Contact Name</label>
                     <input
-                      value={formData.personalDetails.emergencyContactName || ''}
-                      disabled={!canEditPersonal || !isEditing}
-                      onChange={(e) => setPersonal({ emergencyContactName: e.target.value })}
-                      className={fieldClass(canEditPersonal && isEditing)}
+                      type="text"
+                      disabled={!isEditing}
+                      value={formData.personalDetails?.emergencyContactName || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          personalDetails: { ...formData.personalDetails, emergencyContactName: e.target.value },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
                     />
                   </div>
-
                   <div>
-                    <label className="block text-[11px] mb-1 text-slate-600 dark:text-slate-400">Relationship</label>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Relationship</label>
                     <input
-                      value={formData.personalDetails.emergencyContactRelation || ''}
-                      disabled={!canEditPersonal || !isEditing}
-                      onChange={(e) => setPersonal({ emergencyContactRelation: e.target.value })}
-                      className={fieldClass(canEditPersonal && isEditing)}
+                      type="text"
+                      disabled={!isEditing}
+                      value={formData.personalDetails?.emergencyContactRelation || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          personalDetails: { ...formData.personalDetails, emergencyContactRelation: e.target.value },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
                     />
                   </div>
-
                   <div>
-                    <label className="block text-[11px] mb-1 text-slate-600 dark:text-slate-400">Emergency Phone</label>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Emergency Phone</label>
                     <input
-                      value={formData.personalDetails.emergencyContactPhone || ''}
-                      disabled={!canEditPersonal || !isEditing}
-                      onChange={(e) => setPersonal({ emergencyContactPhone: e.target.value })}
-                      className={fieldClass(canEditPersonal && isEditing)}
+                      type="text"
+                      disabled={!isEditing}
+                      value={formData.personalDetails?.emergencyContactPhone || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          personalDetails: { ...formData.personalDetails, emergencyContactPhone: e.target.value },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
                     />
                   </div>
                 </div>
@@ -410,33 +565,52 @@ export const EmployeeProfileModal: React.FC = () => {
             </div>
           )}
 
-          {/* Job */}
+          {/* TAB 2: JOB & EMPLOYMENT */}
           {activeTab === 'job' && (
             <div className="space-y-4">
-              {!isAdmin && (
-                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs">
-                  Job information can only be changed by HR administrators.
-                </div>
-              )}
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold mb-1">Designation / Title</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>Designation / Title</span>
+                    {isEditing && !isAdmin && <span className="text-[10px] text-slate-400 flex items-center gap-1"><Lock className="w-3 h-3" /> HR Managed</span>}
+                  </label>
                   <input
+                    type="text"
+                    disabled={!isEditing || !isAdmin}
                     value={formData.jobDetails.designation}
-                    disabled={!canEditJob || !isEditing}
-                    onChange={(e) => setJob({ designation: e.target.value })}
-                    className={fieldClass(canEditJob && isEditing)}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        jobDetails: { ...formData.jobDetails, designation: e.target.value },
+                      })
+                    }
+                    className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                      isEditing && isAdmin 
+                        ? 'border-purple-400 bg-white ring-1 ring-purple-100' 
+                        : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed select-none'
+                    } outline-none`}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold mb-1">Department</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>Department</span>
+                    {isEditing && !isAdmin && <span className="text-[10px] text-slate-400 flex items-center gap-1"><Lock className="w-3 h-3" /> HR Managed</span>}
+                  </label>
                   <select
+                    disabled={!isEditing || !isAdmin}
                     value={formData.jobDetails.department}
-                    disabled={!canEditJob || !isEditing}
-                    onChange={(e) => setJob({ department: e.target.value as Department })}
-                    className={fieldClass(canEditJob && isEditing)}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        jobDetails: { ...formData.jobDetails, department: e.target.value as Department },
+                      })
+                    }
+                    className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                      isEditing && isAdmin 
+                        ? 'border-purple-400 bg-white ring-1 ring-purple-100' 
+                        : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed select-none'
+                    } outline-none`}
                   >
                     <option value="Engineering">Engineering</option>
                     <option value="Product & Design">Product & Design</option>
@@ -448,12 +622,24 @@ export const EmployeeProfileModal: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold mb-1">Employment Type</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>Employment Type</span>
+                    {isEditing && !isAdmin && <span className="text-[10px] text-slate-400 flex items-center gap-1"><Lock className="w-3 h-3" /> HR Managed</span>}
+                  </label>
                   <select
+                    disabled={!isEditing || !isAdmin}
                     value={formData.jobDetails.employmentType}
-                    disabled={!canEditJob || !isEditing}
-                    onChange={(e) => setJob({ employmentType: e.target.value as EmploymentType })}
-                    className={fieldClass(canEditJob && isEditing)}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        jobDetails: { ...formData.jobDetails, employmentType: e.target.value as EmploymentType },
+                      })
+                    }
+                    className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                      isEditing && isAdmin 
+                        ? 'border-purple-400 bg-white ring-1 ring-purple-100' 
+                        : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed select-none'
+                    } outline-none`}
                   >
                     <option value="Full-Time">Full-Time</option>
                     <option value="Part-Time">Part-Time</option>
@@ -463,12 +649,24 @@ export const EmployeeProfileModal: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold mb-1">Work Location</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>Work Location</span>
+                    {isEditing && !isAdmin && <span className="text-[10px] text-slate-400 flex items-center gap-1"><Lock className="w-3 h-3" /> HR Managed</span>}
+                  </label>
                   <select
+                    disabled={!isEditing || !isAdmin}
                     value={formData.jobDetails.workLocation}
-                    disabled={!canEditJob || !isEditing}
-                    onChange={(e) => setJob({ workLocation: e.target.value as WorkLocation })}
-                    className={fieldClass(canEditJob && isEditing)}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        jobDetails: { ...formData.jobDetails, workLocation: e.target.value as WorkLocation },
+                      })
+                    }
+                    className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                      isEditing && isAdmin 
+                        ? 'border-purple-400 bg-white ring-1 ring-purple-100' 
+                        : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed select-none'
+                    } outline-none`}
                   >
                     <option value="On-Site">On-Site</option>
                     <option value="Hybrid">Hybrid</option>
@@ -477,223 +675,574 @@ export const EmployeeProfileModal: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold mb-1">Date of Joining</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>Date of Joining</span>
+                    {isEditing && !isAdmin && <span className="text-[10px] text-slate-400 flex items-center gap-1"><Lock className="w-3 h-3" /> HR Managed</span>}
+                  </label>
                   <input
                     type="date"
+                    disabled={!isEditing || !isAdmin}
                     value={formData.jobDetails.dateOfJoining}
-                    disabled={!canEditJob || !isEditing}
-                    onChange={(e) => setJob({ dateOfJoining: e.target.value })}
-                    className={fieldClass(canEditJob && isEditing)}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        jobDetails: { ...formData.jobDetails, dateOfJoining: e.target.value },
+                      })
+                    }
+                    className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                      isEditing && isAdmin 
+                        ? 'border-purple-400 bg-white ring-1 ring-purple-100' 
+                        : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed select-none'
+                    } outline-none`}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold mb-1">Reporting Manager</label>
-                  <input
-                    value={formData.jobDetails.managerName || ''}
-                    disabled={!canEditJob || !isEditing}
-                    onChange={(e) => setJob({ managerName: e.target.value })}
-                    className={fieldClass(canEditJob && isEditing)}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Salary */}
-          {activeTab === 'salary' && (
-            <div className="space-y-4">
-              {!isAdmin && (
-                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs">
-                  Salary information can only be changed by HR administrators.
-                </div>
-              )}
-
-              <div className="flex flex-col sm:flex-row justify-between gap-4 p-4 rounded-2xl bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/40 dark:to-indigo-950/40 border border-purple-100 dark:border-purple-900/60">
-                <div>
-                  <span className="text-xs font-semibold text-purple-900 dark:text-purple-300 uppercase tracking-wider">
-                    Total Monthly Gross CTC
-                  </span>
-                  <div className="text-2xl font-bold text-purple-950 dark:text-purple-200">
-                    ${gross.toLocaleString()}
-                  </div>
-                </div>
-
-                <div className="sm:text-right">
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Estimated Net Take-Home
-                  </span>
-                  <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                    ${net.toLocaleString()}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 space-y-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider">
-                    Earnings & Allowances
-                  </h4>
-
-                  {[
-                    ['Basic Salary ($)', 'basicSalary'],
-                    ['House Rent Allowance (HRA) ($)', 'hra'],
-                    ['Conveyance Allowance ($)', 'conveyanceAllowance'],
-                    ['Medical Allowance ($)', 'medicalAllowance'],
-                    ['Special Allowance ($)', 'specialAllowance'],
-                  ].map(([label, key]) => (
-                    <div key={key}>
-                      <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
-                        {label}
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={String(
-                          formData.salaryStructure[
-                            key as keyof Employee['salaryStructure']
-                          ] ?? ''
-                        )}
-                        disabled={!canEditSalary || !isEditing}
-                        onChange={(e) =>
-                          salaryNumber(
-                            key as keyof Employee['salaryStructure'],
-                            e.target.value
-                          )
-                        }
-                        className={moneyFieldClass(canEditSalary && isEditing)}
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 space-y-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider">
-                    Deductions & Taxes
-                  </h4>
-
-                  {[
-                    ['Provident Fund (PF) ($)', 'providentFund'],
-                    ['Income Tax (TDS) ($)', 'incomeTax'],
-                    ['Professional Tax ($)', 'professionalTax'],
-                  ].map(([label, key]) => (
-                    <div key={key}>
-                      <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
-                        {label}
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={String(
-                          formData.salaryStructure[
-                            key as keyof Employee['salaryStructure']
-                          ] ?? ''
-                        )}
-                        disabled={!canEditSalary || !isEditing}
-                        onChange={(e) =>
-                          salaryNumber(
-                            key as keyof Employee['salaryStructure'],
-                            e.target.value
-                          )
-                        }
-                        className={moneyFieldClass(canEditSalary && isEditing)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Documents */}
-          {activeTab === 'documents' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider">
-                    Verified Credentials & Contracts
-                  </h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Official employment documents and compliance papers
-                  </p>
-                </div>
-
-                {canUploadDocuments && (
-                  <label className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold cursor-pointer flex items-center gap-1.5">
-                    <Upload className="w-3.5 h-3.5" />
-                    Upload Document
-                    <input
-                      type="file"
-                      className="hidden"
-                      onChange={handleUpload}
-                    />
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>Reporting Manager</span>
+                    {isEditing && !isAdmin && <span className="text-[10px] text-slate-400 flex items-center gap-1"><Lock className="w-3 h-3" /> HR Managed</span>}
                   </label>
+                  <input
+                    type="text"
+                    disabled={!isEditing || !isAdmin}
+                    value={formData.jobDetails.managerName}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        jobDetails: { ...formData.jobDetails, managerName: e.target.value },
+                      })
+                    }
+                    className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                      isEditing && isAdmin 
+                        ? 'border-purple-400 bg-white ring-1 ring-purple-100' 
+                        : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed select-none'
+                    } outline-none`}
+                  />
+                </div>
+
+                {/* Status selector if editing as Admin */}
+                {isAdmin && (
+                  <div className="sm:col-span-2 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                    <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Employee Status (HR Administrative Control)</span>
+                    </label>
+                    <select
+                      disabled={!isEditing}
+                      value={formData.status}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          status: e.target.value as any,
+                        })
+                      }
+                      className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                        isEditing 
+                          ? 'border-purple-400 bg-white' 
+                          : 'border-slate-200 bg-slate-100 text-slate-600'
+                      } font-semibold`}
+                    >
+                      <option value="Active">Active (Full Access)</option>
+                      <option value="Probation">Probation (Standard Employee)</option>
+                      <option value="On Leave">On Leave (Active Contract)</option>
+                      <option value="Terminated">Terminated (Revoke Portal Access)</option>
+                    </select>
+                  </div>
                 )}
               </div>
 
-              {(formData.documents || []).length === 0 ? (
-                <div className="p-8 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-xs text-slate-500 dark:text-slate-400">
-                  No documents uploaded yet.
+              {/* Admin Separation & Termination Section */}
+              {isAdmin && !isOwner && (
+                <div className="mt-6 pt-5 border-t border-slate-200">
+                  <div className="p-4 rounded-2xl border border-rose-200 bg-rose-50/50 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-xs font-bold text-rose-950 flex items-center gap-1.5">
+                          <Flame className="w-4 h-4 text-rose-600" />
+                          <span>Employee Separation & Termination Control</span>
+                        </h4>
+                        <p className="text-[11px] text-rose-700 mt-0.5">
+                          {isTerminated 
+                            ? 'This employee is currently marked as Terminated. You can reactivate their profile below.'
+                            : 'Formally fire or terminate this employee, update Supabase records, and revoke login credentials.'}
+                        </p>
+                      </div>
+
+                      {isTerminated ? (
+                        <button
+                          type="button"
+                          onClick={handleExecuteRehire}
+                          disabled={isProcessingTermination}
+                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Reactivate Employee</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowFireConfirm(true)}
+                          className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Flame className="w-3.5 h-3.5" />
+                          <span>Fire / Terminate</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* In-modal confirmation accordion */}
+                    {showFireConfirm && !isTerminated && (
+                      <div className="mt-3 p-3.5 bg-white rounded-xl border border-rose-300 space-y-3 animate-in fade-in duration-150">
+                        <div className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
+                          <AlertTriangle className="w-4 h-4 text-rose-600" />
+                          <span>Confirm Termination of {formData.firstName} {formData.lastName}</span>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">Termination Reason</label>
+                          <select
+                            value={fireReason}
+                            onChange={(e) => setFireReason(e.target.value)}
+                            className="w-full p-2 text-xs bg-slate-50 rounded-lg border border-slate-300 text-slate-800"
+                          >
+                            <option value="Performance Discrepancy">Performance Discrepancy / KPI Non-Attainment</option>
+                            <option value="Gross Misconduct / Policy Violation">Gross Misconduct / Policy Violation</option>
+                            <option value="Company Restructuring & Redundancy">Company Restructuring & Workforce Redundancy</option>
+                            <option value="Voluntary Resignation / Separation">Voluntary Resignation / Separation</option>
+                            <option value="Probation Assessment Non-Confirmation">Probation Assessment Non-Confirmation</option>
+                            <option value="Other Administrative Decision">Other Administrative Decision</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">HR Notes</label>
+                          <input
+                            type="text"
+                            placeholder="Optional notes or clearance status..."
+                            value={fireNotes}
+                            onChange={(e) => setFireNotes(e.target.value)}
+                            className="w-full p-2 text-xs bg-slate-50 rounded-lg border border-slate-300 text-slate-800"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setShowFireConfirm(false)}
+                            className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleExecuteFire}
+                            disabled={isProcessingTermination}
+                            className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          >
+                            <Flame className="w-3.5 h-3.5" />
+                            <span>{isProcessingTermination ? 'Processing...' : 'Confirm Fire Employee'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: SALARY STRUCTURE */}
+          {activeTab === 'salary' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-100">
+                <div>
+                  <span className="text-xs font-semibold text-purple-900 uppercase tracking-wider">
+                    Total Monthly Gross CTC
+                  </span>
+                  <div className="text-2xl font-bold text-purple-950 font-display">
+                    $
+                    {(
+                      (formData.salaryStructure?.basicSalary || 0) +
+                      (formData.salaryStructure?.hra || 0) +
+                      (formData.salaryStructure?.conveyanceAllowance || 0) +
+                      (formData.salaryStructure?.medicalAllowance || 0) +
+                      (formData.salaryStructure?.specialAllowance || 0)
+                    ).toLocaleString()}
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Estimated Net Take-Home
+                  </span>
+                  <div className="text-2xl font-bold text-emerald-700 font-display">
+                    $
+                    {(
+                      (formData.salaryStructure?.basicSalary || 0) +
+                      (formData.salaryStructure?.hra || 0) +
+                      (formData.salaryStructure?.conveyanceAllowance || 0) +
+                      (formData.salaryStructure?.medicalAllowance || 0) +
+                      (formData.salaryStructure?.specialAllowance || 0) -
+                      (formData.salaryStructure?.providentFund || 0) -
+                      (formData.salaryStructure?.incomeTax || 0) -
+                      (formData.salaryStructure?.professionalTax || 0)
+                    ).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Earnings breakdown */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center justify-between">
+                  <span>Monthly Earnings Breakdown</span>
+                  {isEditing && !isAdmin && <span className="text-[10px] text-slate-400 flex items-center gap-1"><Lock className="w-3 h-3" /> HR Managed</span>}
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Basic Salary ($)</label>
+                    <input
+                      type="number"
+                      disabled={!isEditing || !isAdmin}
+                      value={formData.salaryStructure?.basicSalary || 0}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          salaryStructure: {
+                            ...formData.salaryStructure,
+                            basicSalary: parseFloat(e.target.value) || 0,
+                          },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing && isAdmin ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">HRA ($)</label>
+                    <input
+                      type="number"
+                      disabled={!isEditing || !isAdmin}
+                      value={formData.salaryStructure?.hra || 0}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          salaryStructure: {
+                            ...formData.salaryStructure,
+                            hra: parseFloat(e.target.value) || 0,
+                          },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing && isAdmin ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Conveyance Allowance ($)</label>
+                    <input
+                      type="number"
+                      disabled={!isEditing || !isAdmin}
+                      value={formData.salaryStructure?.conveyanceAllowance || 0}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          salaryStructure: {
+                            ...formData.salaryStructure,
+                            conveyanceAllowance: parseFloat(e.target.value) || 0,
+                          },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing && isAdmin ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Medical Allowance ($)</label>
+                    <input
+                      type="number"
+                      disabled={!isEditing || !isAdmin}
+                      value={formData.salaryStructure?.medicalAllowance || 0}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          salaryStructure: {
+                            ...formData.salaryStructure,
+                            medicalAllowance: parseFloat(e.target.value) || 0,
+                          },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing && isAdmin ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Special Allowance ($)</label>
+                    <input
+                      type="number"
+                      disabled={!isEditing || !isAdmin}
+                      value={formData.salaryStructure?.specialAllowance || 0}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          salaryStructure: {
+                            ...formData.salaryStructure,
+                            specialAllowance: parseFloat(e.target.value) || 0,
+                          },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing && isAdmin ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Deductions breakdown */}
+              <div className="pt-3 border-t border-slate-200">
+                <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center justify-between">
+                  <span>Monthly Deductions & Tax Provisions</span>
+                  {isEditing && !isAdmin && <span className="text-[10px] text-slate-400 flex items-center gap-1"><Lock className="w-3 h-3" /> HR Managed</span>}
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Provident Fund (PF) ($)</label>
+                    <input
+                      type="number"
+                      disabled={!isEditing || !isAdmin}
+                      value={formData.salaryStructure?.providentFund || 0}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          salaryStructure: {
+                            ...formData.salaryStructure,
+                            providentFund: parseFloat(e.target.value) || 0,
+                          },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing && isAdmin ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Income Tax (TDS) ($)</label>
+                    <input
+                      type="number"
+                      disabled={!isEditing || !isAdmin}
+                      value={formData.salaryStructure?.incomeTax || 0}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          salaryStructure: {
+                            ...formData.salaryStructure,
+                            incomeTax: parseFloat(e.target.value) || 0,
+                          },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing && isAdmin ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Professional Tax ($)</label>
+                    <input
+                      type="number"
+                      disabled={!isEditing || !isAdmin}
+                      value={formData.salaryStructure?.professionalTax || 0}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          salaryStructure: {
+                            ...formData.salaryStructure,
+                            professionalTax: parseFloat(e.target.value) || 0,
+                          },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing && isAdmin ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bank & Tax Details */}
+              <div className="pt-3 border-t border-slate-200">
+                <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+                  <Banknote className="w-4 h-4 text-purple-600" />
+                  <span>Disbursement Account & Tax IDs</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Bank Name</label>
+                    <input
+                      type="text"
+                      disabled={!isEditing}
+                      value={formData.bankDetails?.bankName || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          bankDetails: { ...formData.bankDetails, bankName: e.target.value },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Account Number (Masked)</label>
+                    <input
+                      type="text"
+                      disabled={!isEditing}
+                      value={formData.bankDetails?.accountNumberMasked || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          bankDetails: { ...formData.bankDetails, accountNumberMasked: e.target.value },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Tax Identification / PAN</label>
+                    <input
+                      type="text"
+                      disabled={!isEditing}
+                      value={formData.bankDetails?.panOrTaxId || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          bankDetails: { ...formData.bankDetails, panOrTaxId: e.target.value },
+                        })
+                      }
+                      className={`w-full px-3 py-1.5 text-xs rounded-lg border ${
+                        isEditing ? 'border-purple-400 bg-white' : 'border-slate-200 bg-slate-100/70 text-slate-600 cursor-not-allowed'
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: DOCUMENTS */}
+          {activeTab === 'documents' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900">Uploaded Verification Documents</h4>
+                  <p className="text-[11px] text-slate-500">Employment agreements, government IDs, and certificates</p>
+                </div>
+                <label className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload File</span>
+                  <input type="file" className="hidden" onChange={handleAddDocument} />
+                </label>
+              </div>
+
+              {formData.documents.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                  <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-xs font-medium text-slate-600">No documents uploaded yet</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Upload onboarding contracts, ID proofs, or degrees</p>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {(formData.documents || []).map((doc) => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {formData.documents.map((doc) => (
                     <div
                       key={doc.id}
-                      className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/70 flex items-center justify-between gap-3"
+                      className="p-3 rounded-2xl bg-white border border-slate-200 flex items-center justify-between gap-3 hover:border-purple-200 hover:shadow-2xs transition-all"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 flex items-center justify-center">
-                          <FileText className="w-4 h-4" />
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold text-[10px] shrink-0">
+                          {doc.type}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-xs font-bold truncate">
-                            {doc.name}
-                          </div>
+                          <div className="text-xs font-bold text-slate-900 truncate">{doc.name}</div>
                           <div className="text-[10px] text-slate-400">
                             {doc.size} • Uploaded {doc.uploadDate}
                           </div>
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          addToast(
-                            'info',
-                            'File Download',
-                            `Downloading ${doc.name} is not connected to Storage yet.`
-                          )
-                        }
-                        className="p-1.5 text-slate-400 hover:text-purple-500"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold">
+                          {doc.status}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
           )}
+
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between shrink-0">
-          <div className="text-xs text-slate-500 dark:text-slate-400">
-            Employee ID:{' '}
-            <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
-              {formData.employeeId}
-            </span>
+        {/* Modal Footer */}
+        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
+          <div className="text-xs text-slate-500">
+            Employee ID: <span className="font-mono font-bold text-slate-700">{formData.employeeId}</span>
           </div>
+          
+          <div className="flex items-center gap-2">
+            {/* Quick Fire Button in Footer for Admin */}
+            {isAdmin && !isOwner && !isTerminated && !isEditing && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('job');
+                  setShowFireConfirm(true);
+                }}
+                className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Flame className="w-3.5 h-3.5 text-rose-600" />
+                <span>Fire Employee</span>
+              </button>
+            )}
 
-          <button
-            type="button"
-            onClick={closeEmployeeProfile}
-            className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 text-xs font-semibold"
-          >
-            Close
-          </button>
+            {isEditing && (
+              <button
+                type="button"
+                id="modal-footer-cancel-btn"
+                onClick={handleCancel}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            )}
+            {isEditing ? (
+              <button
+                type="button"
+                id="modal-footer-save-btn"
+                onClick={handleSave}
+                className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Save Changes</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                id="modal-footer-close-btn"
+                onClick={closeEmployeeProfile}
+                className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            )}
+          </div>
         </div>
+
       </div>
     </div>
   );

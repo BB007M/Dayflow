@@ -3,7 +3,7 @@ export interface LoginAuditLog {
   userId?: string | null;
   email: string;
   role: string;
-  status: 'SUCCESS' | 'FAILED' | 'LOGOUT' | 'REGISTERED';
+  status: 'SUCCESS' | 'FAILED' | 'LOGOUT' | 'TIMEOUT_LOGOUT' | 'REGISTERED';
   ipAddress?: string;
   userAgent?: string;
   timestamp: string;
@@ -11,7 +11,7 @@ export interface LoginAuditLog {
 
 export interface DatabaseStatus {
   connected: boolean;
-  type: 'Cloud SQL / PostgreSQL (Supabase Compatible)';
+  type: 'Supabase Database' | 'Supabase PostgreSQL';
   totalUsers: number;
   totalLogs: number;
 }

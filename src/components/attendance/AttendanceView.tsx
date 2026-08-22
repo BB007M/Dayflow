@@ -19,7 +19,10 @@ import {
   CalendarDays,
   Plus,
   SlidersHorizontal,
-  Edit2
+  Edit2,
+  Database,
+  RefreshCw,
+  Activity
 } from 'lucide-react';
 
 export const AttendanceView: React.FC = () => {
@@ -27,6 +30,8 @@ export const AttendanceView: React.FC = () => {
     currentUser, 
     currentRole, 
     attendanceRecords, 
+    attendanceDbLogs,
+    refreshAttendanceLogs,
     employees, 
     checkInState, 
     checkIn, 
@@ -38,11 +43,18 @@ export const AttendanceView: React.FC = () => {
 
   const isAdmin = currentRole === 'admin';
 
-  const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'calendar'>('weekly');
+  const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'db_logs'>('weekly');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [searchEmployee, setSearchEmployee] = useState('');
   const [selectedDept, setSelectedDept] = useState<string>('All');
   const [regularizeModalRecord, setRegularizeModalRecord] = useState<AttendanceRecord | null>(null);
+  const [isRefreshingLogs, setIsRefreshingLogs] = useState(false);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshingLogs(true);
+    await refreshAttendanceLogs();
+    setTimeout(() => setIsRefreshingLogs(false), 400);
+  };
 
   // Form state for regularizing/editing attendance
   const [editStatus, setEditStatus] = useState<AttendanceStatus>('present');
@@ -264,27 +276,38 @@ export const AttendanceView: React.FC = () => {
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           
-          {/* View Mode Buttons (PDF 3.4.1) */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 w-full sm:w-auto">
+          {/* View Mode Buttons (PDF 3.4.1 + Supabase DB Logs) */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200 dark:border-slate-700 w-full sm:w-auto overflow-x-auto">
             <button
               onClick={() => setViewMode('weekly')}
-              className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === 'weekly'
-                  ? 'bg-white text-purple-700 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Weekly Grid View
+              Weekly Grid
             </button>
             <button
               onClick={() => setViewMode('daily')}
-              className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === 'daily'
-                  ? 'bg-white text-purple-700 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Daily Timeline
+            </button>
+            <button
+              onClick={() => setViewMode('db_logs')}
+              className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'db_logs'
+                  ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Attendance DB Logs</span>
             </button>
           </div>
 
@@ -543,7 +566,116 @@ export const AttendanceView: React.FC = () => {
         </div>
       )}
 
-      {/* Admin Regularize Attendance Modal */}
+      {/* VIEW 3: Real-Time Supabase Attendance DB Logs */}
+      {viewMode === 'db_logs' && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
+          <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-900/50">
+            <div>
+              <div className="flex items-center gap-2">
+                <Database className="w-5 h-5 text-emerald-500" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white font-display">
+                  Supabase Attendance Database Audit Logs
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Real-time check-in, check-out, break intervals, and regularization telemetry persisted in <code className="font-mono text-purple-600 dark:text-purple-400">attendance_logs</code>.
+              </p>
+            </div>
+
+            <button
+              onClick={handleManualRefresh}
+              disabled={isRefreshingLogs}
+              className="px-3.5 py-1.5 rounded-xl bg-purple-100 dark:bg-purple-950/60 hover:bg-purple-200 dark:hover:bg-purple-900/80 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800/80 font-semibold text-xs transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer self-start sm:self-auto"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingLogs ? 'animate-spin' : ''}`} />
+              <span>Refresh DB Logs</span>
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-100/70 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 font-semibold">
+                  <th className="py-3 px-4">Event Time (UTC)</th>
+                  <th className="py-3 px-4">Action Type</th>
+                  <th className="py-3 px-4">Employee</th>
+                  <th className="py-3 px-4">Work Email</th>
+                  <th className="py-3 px-4">Work Date</th>
+                  <th className="py-3 px-4">Check In</th>
+                  <th className="py-3 px-4">Check Out</th>
+                  <th className="py-3 px-4">Worked Hrs</th>
+                  <th className="py-3 px-4">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
+                {attendanceDbLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center text-slate-400">
+                      No database punch logs recorded yet. Check in or out to log telemetry into Supabase.
+                    </td>
+                  </tr>
+                ) : (
+                  attendanceDbLogs
+                    .filter((log) => {
+                      if (isAdmin) return true;
+                      return log.email === currentUser?.email || log.employee_id === currentUser?.employeeId;
+                    })
+                    .map((log) => {
+                      const actionBadge = (type: string) => {
+                        switch (type) {
+                          case 'CHECK_IN':
+                            return <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-semibold text-[10px]">CHECK IN</span>;
+                          case 'CHECK_OUT':
+                            return <span className="px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 font-semibold text-[10px]">CHECK OUT</span>;
+                          case 'BREAK_START':
+                            return <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-semibold text-[10px]">BREAK START</span>;
+                          case 'BREAK_END':
+                            return <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 font-semibold text-[10px]">BREAK END</span>;
+                          case 'MANUAL_PUNCH':
+                            return <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 font-semibold text-[10px]">MANUAL REGULARIZATION</span>;
+                          default:
+                            return <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-[10px]">{type}</span>;
+                        }
+                      };
+
+                      return (
+                        <tr key={log.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3 px-4 font-mono text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                            {new Date(log.created_at).toLocaleString()}
+                          </td>
+                          <td className="py-3 px-4">
+                            {actionBadge(log.action_type)}
+                          </td>
+                          <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white">
+                            {log.employee_name} <span className="text-slate-400 font-normal">({log.employee_id})</span>
+                          </td>
+                          <td className="py-3 px-4 font-mono text-purple-700 dark:text-purple-300 text-[11px]">
+                            {log.email}
+                          </td>
+                          <td className="py-3 px-4 font-mono text-[11px]">
+                            {log.date}
+                          </td>
+                          <td className="py-3 px-4 font-mono text-[11px]">
+                            {log.check_in_time || '--'}
+                          </td>
+                          <td className="py-3 px-4 font-mono text-[11px]">
+                            {log.check_out_time || '--'}
+                          </td>
+                          <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
+                            {log.total_hours_worked ? `${log.total_hours_worked} hrs` : '--'}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="capitalize font-medium">{log.status}</span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       {regularizeModalRecord && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6">

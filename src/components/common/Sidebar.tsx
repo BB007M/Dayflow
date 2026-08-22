@@ -14,9 +14,7 @@ import {
   ChevronRight,
   ShieldCheck,
   Building2,
-  FileCheck,
-  Sun,
-  Moon
+  FileCheck
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -43,16 +41,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
     currentRole, 
     currentUser, 
     leaveRequests,
+    switchRole,
     openEmployeeProfile,
     openAuthModal,
-    signOut,
-    isDarkMode,
-    toggleDarkMode
+    signOut
   } = useHR();
 
   const pendingLeavesCount = leaveRequests.filter((l) => l.status === 'Pending').length;
 
   const navItems = [
+    {
+      id: 'admin',
+      label: 'Admin Console',
+      icon: ShieldCheck,
+      roles: ['admin'],
+      adminOnlyBadge: true,
+    },
     {
       id: 'dashboard',
       label: 'Dashboard',
@@ -92,6 +96,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
   ];
 
+  const visibleNavItems = navItems.filter((item) => item.roles.includes(currentRole));
+
   const handleNavClick = (tabId: string) => {
     setActiveTab(tabId);
     if (window.innerWidth < 1024) {
@@ -110,10 +116,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       {/* Sidebar Container */}
-      <aside 
-        className={`fixed top-0 bottom-0 left-0 z-40 w-64 h-screen bg-slate-900 text-slate-100 flex flex-col border-r border-slate-800 transition-transform duration-300 ease-in-out ${
-        isMobileOpen ? 'translate-x-0' : '-translate-x-full'
-        } lg:translate-x-0`}
+      <aside
+        className={`fixed top-0 bottom-0 left-0 z-40 w-64 bg-slate-900 text-slate-100 flex flex-col border-r border-slate-800 transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+        } lg:static lg:z-10`}
       >
         {/* Brand Header */}
         <div className="p-5 border-b border-slate-800 flex items-center justify-between">
@@ -139,7 +145,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             Main Operations
           </div>
 
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (
@@ -164,31 +170,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             );
           })}
+
+          {/* Quick Database Security Status */}
+          <div className="pt-3">
+            <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+              System Infrastructure
+            </div>
+            <div className="mx-2 p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50 text-[11px] text-slate-300 flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Supabase Database Active</span>
+            </div>
+          </div>
         </div>
 
-        {/* Current User & Role Switcher Footer */}
+        {/* Current User & Logout Footer */}
         <div className="p-3 border-t border-slate-800 bg-slate-950/60 space-y-2">
           {/* Active User Card */}
           {currentUser ? (
-            <div 
-              onClick={() => openEmployeeProfile(currentUser)}
-              className="flex items-center gap-3 p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 cursor-pointer border border-slate-800 transition-colors"
-            >
-              <img
-                src={currentUser.avatar}
-                alt={currentUser.firstName}
-                className="w-9 h-9 rounded-lg object-cover ring-1 ring-purple-500/40"
-              />
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-white truncate">
-                  {currentUser.firstName} {currentUser.lastName}
+            <>
+              <div 
+                onClick={() => openEmployeeProfile(currentUser)}
+                className="flex items-center gap-3 p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 cursor-pointer border border-slate-800 transition-colors"
+                title="View Profile Details"
+              >
+                <img
+                  src={currentUser.avatar}
+                  alt={currentUser.firstName}
+                  className="w-9 h-9 rounded-lg object-cover ring-1 ring-purple-500/40"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-white truncate">
+                    {currentUser.firstName} {currentUser.lastName}
+                  </div>
+                  <div className="text-[11px] text-slate-400 truncate">
+                    {currentRole === 'admin' ? 'HR Officer (Admin)' : currentUser.jobDetails.designation}
+                  </div>
                 </div>
-                <div className="text-[11px] text-slate-400 truncate">
-                  {currentRole === 'admin' ? 'HR Officer (Admin)' : currentUser.jobDetails.designation}
-                </div>
+                <UserCircle className="w-4 h-4 text-slate-400 hover:text-purple-300" />
               </div>
-              <UserCircle className="w-4 h-4 text-slate-400 hover:text-purple-300" />
-            </div>
+
+              {/* Logout Button */}
+              <button
+                onClick={() => signOut()}
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-xs font-semibold text-rose-300 hover:text-white transition-all cursor-pointer shadow-sm"
+              >
+                <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                <span>Sign Out</span>
+              </button>
+            </>
           ) : (
             <button
               onClick={() => openAuthModal('signin')}
@@ -198,24 +227,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="font-semibold text-white underline">Sign In</span>
             </button>
           )}
-
-          {/* Dark / Light Mode Toggle Button in Sidebar */}
-          <button
-            onClick={toggleDarkMode}
-            className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              {isDarkMode ? (
-                <Sun className="w-3.5 h-3.5 text-amber-400" />
-              ) : (
-                <Moon className="w-3.5 h-3.5 text-indigo-400" />
-              )}
-              <span>Appearance:</span>
-            </div>
-            <div className="flex items-center gap-1 text-[11px] font-semibold text-purple-300 bg-purple-950/60 border border-purple-800/40 px-2 py-0.5 rounded">
-              {isDarkMode ? 'Dark Mode' : 'Light Mode'}
-            </div>
-          </button>
 
         </div>
       </aside>
