@@ -257,7 +257,7 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                 className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700 cursor-pointer"
               >
-                <ProfilePlaceholder label={`${currentUser.firstName} ${currentUser.lastName}`} className="w-7 h-7 sm:w-8 sm:h-8" />
+                <ProfilePlaceholder imageUrl={currentUser.avatar} label={`${currentUser.firstName} ${currentUser.lastName}`} className="w-7 h-7 sm:w-8 sm:h-8" />
                 <div className="hidden xl:flex flex-col text-left">
                   <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-tight">
                     {currentUser.firstName} {currentUser.lastName}

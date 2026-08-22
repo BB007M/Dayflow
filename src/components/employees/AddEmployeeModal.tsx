@@ -15,15 +15,15 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onCl
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('+1 (555) 302-8819');
+  const [phone, setPhone] = useState('+91 98765 30281');
   const [role, setRole] = useState<UserRole>('employee');
   const [designation, setDesignation] = useState('Product Specialist');
   const [department, setDepartment] = useState<Department>('Engineering');
   const [employmentType, setEmploymentType] = useState<EmploymentType>('Full-Time');
   const [workLocation, setWorkLocation] = useState<WorkLocation>('Hybrid');
-  const [managerName, setManagerName] = useState('Sarah Jenkins');
-  const [city, setCity] = useState('San Francisco, CA');
-  const [basicSalary, setBasicSalary] = useState(6500);
+  const [managerName, setManagerName] = useState('Ananya Sharma');
+  const [city, setCity] = useState('Bengaluru, Karnataka');
+  const [basicSalary, setBasicSalary] = useState(65000);
   const [initialPassword, setInitialPassword] = useState('EmployeePass2026!');
   const [showPassword, setShowPassword] = useState(false);
 
@@ -34,11 +34,11 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onCl
     if (!firstName || !lastName || !email) return;
 
     const hra = Math.round(basicSalary * 0.4);
-    const conveyance = 400;
-    const medical = 400;
-    const special = 1200;
-    const pf = Math.round(basicSalary * 0.12);
-    const tax = Math.round(basicSalary * 0.16);
+    const conveyance = 3000;
+    const medical = 1500;
+    const special = 8500;
+    const pf = 1800;
+    const tax = Math.round(basicSalary * 0.12);
 
     addNewEmployee({
       employeeId,
@@ -60,13 +60,13 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onCl
       personalDetails: {
         dob: '1995-05-20',
         gender: 'Prefer not to say',
-        address: '500 Howard St',
+        address: '12 Outer Ring Road',
         city,
-        country: 'United States',
+        country: 'India',
         emergencyContactName: 'Family Contact',
-        emergencyContactPhone: '+1 (555) 888-9900',
+        emergencyContactPhone: '+91 98765 88990',
         emergencyContactRelation: 'Family',
-        nationality: 'American',
+        nationality: 'Indian',
       },
       salaryStructure: {
         basicSalary,
@@ -77,7 +77,7 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onCl
         providentFund: pf,
         professionalTax: 200,
         incomeTax: tax,
-        currency: 'USD',
+        currency: 'INR',
       },
       leaveBalance: {
         paidLeave: { total: 18, used: 0, remaining: 18 },
@@ -97,10 +97,10 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onCl
       ],
       status: 'Active',
       bankDetails: {
-        bankName: 'Dayflow Federal Credit Union',
+        bankName: 'State Bank of India',
         accountNumberMasked: '•••• •••• •••• 9901',
-        ifscOrRouting: 'DFCU0001',
-        panOrTaxId: 'US-TAX-NEW',
+        ifscOrRouting: 'SBIN0001234',
+        panOrTaxId: 'ABCDE1234F',
       },
     }, initialPassword);
 
@@ -236,7 +236,7 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onCl
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Monthly Base Salary ($)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Monthly Base Salary (₹)</label>
               <input
                 type="number"
                 value={basicSalary}

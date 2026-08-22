@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useHR } from '../../context/HRContext';
 import { ProfilePlaceholder } from '../common/ProfilePlaceholder';
 import { Employee, Department, EmploymentType, WorkLocation } from '../../types';
@@ -48,6 +48,8 @@ export const EmployeeProfileModal: React.FC = () => {
   const [fireReason, setFireReason] = useState('Performance Discrepancy');
   const [fireNotes, setFireNotes] = useState('');
   const [isProcessingTermination, setIsProcessingTermination] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Sync state if selectedEmployeeForModal changes
   React.useEffect(() => {
@@ -74,6 +76,52 @@ export const EmployeeProfileModal: React.FC = () => {
   const handleCancel = () => {
     setFormData(selectedEmployeeForModal);
     setIsEditing(false);
+  };
+
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !formData) return;
+
+    if (!file.type.startsWith('image/')) {
+      addToast('error', 'Choose an image', 'Please select a JPG, PNG, WebP, or other image file.');
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      addToast('error', 'Image is too large', 'Choose an image smaller than 4 MB.');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const fileData = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Unable to read the selected image.'));
+        reader.readAsDataURL(file);
+      });
+      const response = await fetch('/api/storage/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: `avatar-${formData.id}-${Date.now()}-${file.name}`,
+          fileData,
+          bucket: 'avatars',
+          contentType: file.type,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success || !result.url) {
+        throw new Error(result.error || 'Image upload failed.');
+      }
+
+      setFormData((current) => current ? { ...current, avatar: result.url } : current);
+      addToast('success', 'Photo ready', 'Your new profile photo will be saved with the profile changes.');
+    } catch (error) {
+      addToast('error', 'Photo upload failed', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setIsUploadingAvatar(false);
+      event.target.value = '';
+    }
   };
 
   const handleExecuteFire = async () => {
@@ -223,7 +271,28 @@ export const EmployeeProfileModal: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 pr-0 sm:pr-36">
             <div className="relative group shrink-0">
-                <ProfilePlaceholder label={`${formData.firstName} ${formData.lastName}`} className={`w-20 h-20 text-lg rounded-2xl ring-4 shadow-lg ${isTerminated ? 'ring-rose-400/40' : 'ring-white/20'}`} />
+                <ProfilePlaceholder imageUrl={formData.avatar} label={`${formData.firstName} ${formData.lastName}`} className={`w-20 h-20 text-lg rounded-2xl ring-4 shadow-lg ${isTerminated ? 'ring-rose-400/40' : 'ring-white/20'}`} />
+                {isEditing && canEdit && (
+                  <>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={handleAvatarChange}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={isUploadingAvatar}
+                      className="absolute -bottom-2 -right-2 h-8 w-8 rounded-xl border border-white/25 bg-white text-purple-700 shadow-lg transition hover:scale-105 disabled:cursor-wait disabled:opacity-70 flex items-center justify-center"
+                      aria-label="Upload profile photo"
+                      title="Upload profile photo"
+                    >
+                      <Upload className={`h-3.5 w-3.5 ${isUploadingAvatar ? 'animate-pulse' : ''}`} />
+                    </button>
+                  </>
+                )}
             </div>
 
             <div className="text-center sm:text-left flex-1 min-w-0">

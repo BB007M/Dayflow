@@ -3,9 +3,10 @@ import React from 'react';
 interface ProfilePlaceholderProps {
   label: string;
   className?: string;
+  imageUrl?: string;
 }
 
-export const ProfilePlaceholder: React.FC<ProfilePlaceholderProps> = ({ label, className = '' }) => {
+export const ProfilePlaceholder: React.FC<ProfilePlaceholderProps> = ({ label, className = '', imageUrl }) => {
   const initials = label
     .split(' ')
     .filter(Boolean)
@@ -15,7 +16,14 @@ export const ProfilePlaceholder: React.FC<ProfilePlaceholderProps> = ({ label, c
 
   return (
     <div className={`flex items-center justify-center rounded-xl bg-slate-200 text-xs font-bold text-slate-600 ring-1 ring-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700 ${className}`} aria-label={`${label} profile`}>
-      {initials || '?'}
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt={`${label} profile`}
+          className="h-full w-full rounded-[inherit] object-cover"
+          onError={(event) => { event.currentTarget.style.display = 'none'; }}
+        />
+      ) : (initials || '?')}
     </div>
   );
 };

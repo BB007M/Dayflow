@@ -9,7 +9,7 @@ import { INITIAL_EMPLOYEES } from './src/data/initialData.js';
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '7mb' }));
 
 // Supabase configuration with robust environment & local fallback
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
@@ -46,7 +46,7 @@ function toUserPayload(user: any) {
     firstName: user.first_name || user.firstName,
     lastName: user.last_name || user.lastName,
     role: user.role,
-    phone: user.phone || '+1 (555) 000-1122',
+    phone: user.phone || '+91 98765 00011',
     avatar: user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
     status: user.status || 'Active',
     jobDetails: user.job_details || user.jobDetails || {},
@@ -133,7 +133,7 @@ let inMemoryUsers: UserRecord[] = INITIAL_EMPLOYEES.map((emp) => ({
   lastName: emp.lastName,
   role: emp.role,
   department: emp.jobDetails.department,
-  phone: emp.phone || '+1 (555) 700-6413',
+  phone: emp.phone || '+91 98765 70001',
   avatar: emp.avatar,
   status: emp.status || 'Active',
   jobDetails: emp.jobDetails,
@@ -293,7 +293,7 @@ app.get('/api/employees', async (req, res) => {
           firstName: user.first_name || user.firstName,
           lastName: user.last_name || user.lastName,
           role: user.role,
-          phone: user.phone || '+1 (555) 000-1122',
+          phone: user.phone || '+91 98765 00011',
           avatar: user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
           status: user.status || 'Active',
           jobDetails: user.job_details || user.jobDetails,
@@ -573,26 +573,26 @@ app.post('/api/auth/signup', async (req, res) => {
     dob: personalDetails?.dob || '1998-05-15',
     gender: personalDetails?.gender || 'Prefer not to say',
     address: personalDetails?.address || '123 Enterprise Blvd',
-    city: personalDetails?.city || 'San Francisco, CA',
-    country: personalDetails?.country || 'United States',
+    city: personalDetails?.city || 'Bengaluru, Karnataka',
+    country: personalDetails?.country || 'India',
     emergencyContactName: personalDetails?.emergencyContactName || 'Family Contact',
-    emergencyContactPhone: personalDetails?.emergencyContactPhone || '+1 (555) 999-8877',
+    emergencyContactPhone: personalDetails?.emergencyContactPhone || '+91 98765 99987',
     emergencyContactRelation: personalDetails?.emergencyContactRelation || 'Guardian',
-    nationality: personalDetails?.nationality || 'American',
+    nationality: personalDetails?.nationality || 'Indian',
     ...(personalDetails || {}),
   };
 
-  const basicSalary = salaryStructure?.basicSalary || 6000;
+  const basicSalary = salaryStructure?.basicSalary || 60000;
   const resolvedSalaryStructure = {
     basicSalary,
     hra: salaryStructure?.hra ?? Math.round(basicSalary * 0.4),
-    conveyanceAllowance: salaryStructure?.conveyanceAllowance ?? 400,
-    medicalAllowance: salaryStructure?.medicalAllowance ?? 400,
-    specialAllowance: salaryStructure?.specialAllowance ?? 1000,
-    providentFund: salaryStructure?.providentFund ?? Math.round(basicSalary * 0.12),
+    conveyanceAllowance: salaryStructure?.conveyanceAllowance ?? 3000,
+    medicalAllowance: salaryStructure?.medicalAllowance ?? 1500,
+    specialAllowance: salaryStructure?.specialAllowance ?? 7500,
+    providentFund: salaryStructure?.providentFund ?? 1800,
     professionalTax: salaryStructure?.professionalTax ?? 200,
-    incomeTax: salaryStructure?.incomeTax ?? Math.round(basicSalary * 0.16),
-    currency: salaryStructure?.currency || 'USD',
+    incomeTax: salaryStructure?.incomeTax ?? Math.round(basicSalary * 0.12),
+    currency: salaryStructure?.currency || 'INR',
     ...(salaryStructure || {}),
   };
 
@@ -605,10 +605,10 @@ app.post('/api/auth/signup', async (req, res) => {
   };
 
   const resolvedBankDetails = {
-    bankName: bankDetails?.bankName || 'Dayflow Federal Credit Union',
+    bankName: bankDetails?.bankName || 'State Bank of India',
     accountNumberMasked: bankDetails?.accountNumberMasked || '•••• •••• •••• 1092',
-    ifscOrRouting: bankDetails?.ifscOrRouting || 'DFCU0001',
-    panOrTaxId: bankDetails?.panOrTaxId || 'US-TAX-NEW',
+    ifscOrRouting: bankDetails?.ifscOrRouting || 'SBIN0001234',
+    panOrTaxId: bankDetails?.panOrTaxId || 'ABCDE1234F',
     ...(bankDetails || {}),
   };
 
@@ -621,7 +621,7 @@ app.post('/api/auth/signup', async (req, res) => {
     lastName,
     role: role || 'employee',
     department: resolvedJobDetails.department,
-    phone: phone || '+1 (555) 000-1122',
+    phone: phone || '+91 98765 00011',
     avatar: avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
     status: status || 'Active',
     jobDetails: resolvedJobDetails,
@@ -774,7 +774,7 @@ app.post('/api/employees', async (req, res) => {
     lastName: newEmp.lastName,
     role: newEmp.role || 'employee',
     department: newEmp.department || newEmp.jobDetails?.department || 'Engineering',
-    phone: newEmp.phone || '+1 (555) 000-1122',
+    phone: newEmp.phone || '+91 98765 00011',
     avatar: newEmp.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
     status: newEmp.status || 'Active',
     jobDetails: newEmp.jobDetails || {},
@@ -829,6 +829,55 @@ app.post('/api/employees', async (req, res) => {
   else inMemoryUsers.unshift(empRecord);
 
   res.json({ success: true, employee: empRecord });
+});
+
+// Update an employee profile, including a stored avatar URL.
+app.put('/api/employees/:id', async (req, res) => {
+  const { id } = req.params;
+  const updates = req.body || {};
+  const existing = inMemoryUsers.find((user) => user.id === id || user.employeeId === id);
+
+  if (!existing) {
+    return res.status(404).json({ success: false, error: 'Employee not found.' });
+  }
+
+  const dbUpdates: Record<string, unknown> = {};
+  if (updates.employeeId !== undefined) dbUpdates.employee_id = updates.employeeId;
+  if (updates.email !== undefined) dbUpdates.email = String(updates.email).trim().toLowerCase();
+  if (updates.firstName !== undefined) dbUpdates.first_name = updates.firstName;
+  if (updates.lastName !== undefined) dbUpdates.last_name = updates.lastName;
+  if (updates.role !== undefined) dbUpdates.role = updates.role;
+  if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+  if (updates.avatar !== undefined) dbUpdates.avatar = updates.avatar;
+  if (updates.status !== undefined) dbUpdates.status = updates.status;
+  if (updates.jobDetails !== undefined) {
+    dbUpdates.job_details = updates.jobDetails;
+    dbUpdates.department = updates.jobDetails.department || existing.department;
+  }
+  if (updates.personalDetails !== undefined) dbUpdates.personal_details = updates.personalDetails;
+  if (updates.salaryStructure !== undefined) dbUpdates.salary_structure = updates.salaryStructure;
+  if (updates.leaveBalance !== undefined) dbUpdates.leave_balance = updates.leaveBalance;
+  if (updates.bankDetails !== undefined) dbUpdates.bank_details = updates.bankDetails;
+
+  const sb = getSupabase();
+  if (!sb) {
+    return res.status(503).json({ success: false, error: 'Database is unavailable. Configure Supabase server credentials.' });
+  }
+
+  const { error } = await sb.from('users').update(dbUpdates).or(`id.eq.${id},employee_id.eq.${id}`);
+  if (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+
+  const updatedEmployee: UserRecord = {
+    ...existing,
+    ...updates,
+    email: updates.email !== undefined ? String(updates.email).trim().toLowerCase() : existing.email,
+    department: updates.jobDetails?.department || updates.department || existing.department,
+  };
+  inMemoryUsers = inMemoryUsers.map((user) => user.id === existing.id ? updatedEmployee : user);
+
+  return res.json({ success: true, employee: updatedEmployee });
 });
 
 // Auth: Logout (Record audit log & destroy session)

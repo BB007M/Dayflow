@@ -117,16 +117,16 @@ interface HRContextType {
 const HRContext = createContext<HRContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  EMPLOYEES: 'dayflow_hrms_employees_v2',
-  ATTENDANCE: 'dayflow_hrms_attendance_v2',
-  LEAVES: 'dayflow_hrms_leaves_v2',
-  PAYSLIPS: 'dayflow_hrms_payslips_v2',
-  NOTIFICATIONS: 'dayflow_hrms_notifications_v2',
-  CURRENT_USER_ID: 'dayflow_hrms_current_user_id_v2',
-  AUTH_TOKEN: 'dayflow_hrms_auth_token_v2',
-  LAST_ACTIVITY: 'dayflow_hrms_last_activity_v2',
-  CHECK_IN_STATE: 'dayflow_hrms_checkin_state_v2',
-  THEME: 'dayflow_hrms_theme_v2',
+  EMPLOYEES: 'dayflow_hrms_employees_v3',
+  ATTENDANCE: 'dayflow_hrms_attendance_v3',
+  LEAVES: 'dayflow_hrms_leaves_v3',
+  PAYSLIPS: 'dayflow_hrms_payslips_v3',
+  NOTIFICATIONS: 'dayflow_hrms_notifications_v3',
+  CURRENT_USER_ID: 'dayflow_hrms_current_user_id_v3',
+  AUTH_TOKEN: 'dayflow_hrms_auth_token_v3',
+  LAST_ACTIVITY: 'dayflow_hrms_last_activity_v3',
+  CHECK_IN_STATE: 'dayflow_hrms_checkin_state_v3',
+  THEME: 'dayflow_hrms_theme_v3',
 };
 
 export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

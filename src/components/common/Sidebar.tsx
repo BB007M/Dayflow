@@ -194,7 +194,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className="flex items-center gap-3 p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 cursor-pointer border border-slate-800 transition-colors"
                 title="View Profile Details"
               >
-                <ProfilePlaceholder label={`${currentUser.firstName} ${currentUser.lastName}`} className="w-9 h-9" />
+                <ProfilePlaceholder imageUrl={currentUser.avatar} label={`${currentUser.firstName} ${currentUser.lastName}`} className="w-9 h-9" />
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-white truncate">
                     {currentUser.firstName} {currentUser.lastName}
