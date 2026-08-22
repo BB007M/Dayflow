@@ -52,9 +52,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navItems = [
     {
       id: 'admin',
-      label: 'Admin Console (/admin)',
+      label: 'Admin Console',
       icon: ShieldCheck,
-      roles: ['admin', 'employee'],
+      roles: ['admin'],
       adminOnlyBadge: true,
     },
     {
@@ -95,6 +95,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       roles: ['admin', 'employee'],
     },
   ];
+
+  const visibleNavItems = navItems.filter((item) => item.roles.includes(currentRole));
 
   const handleNavClick = (tabId: string) => {
     setActiveTab(tabId);
@@ -143,7 +145,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             Main Operations
           </div>
 
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (

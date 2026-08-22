@@ -108,6 +108,23 @@ export interface AttendanceRecord {
   regularizedBy?: string;
 }
 
+export interface AttendanceDbLog {
+  id: string;
+  employeeId: string;
+  employeeName?: string;
+  email?: string;
+  date: string;
+  actionType: 'CHECK_IN' | 'CHECK_OUT' | 'BREAK_START' | 'BREAK_END' | 'MANUAL_PUNCH';
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
+  totalHoursWorked?: number;
+  breakMinutes?: number;
+  status: string;
+  ipAddress?: string;
+  userAgent?: string;
+  timestamp: string;
+}
+
 export interface LeaveRequest {
   id: string;
   employeeId: string;
@@ -171,4 +188,22 @@ export interface CheckInState {
   breakStartTimestamp: string | null;
   accumulatedWorkedSeconds: number;
   accumulatedBreakSeconds: number;
+}
+
+export interface CelebrationDetailItem {
+  label: string;
+  value: string;
+}
+
+export interface CelebrationPopupData {
+  id?: string;
+  type: 'leave_applied' | 'leave_approved' | 'employee_onboarded' | 'payroll_disbursed' | 'general';
+  title: string;
+  subtitle: string;
+  badge?: string;
+  details?: CelebrationDetailItem[];
+  employeeName?: string;
+  employeeAvatar?: string;
+  statusText?: string;
+  statusVariant?: 'success' | 'indigo' | 'purple' | 'amber';
 }

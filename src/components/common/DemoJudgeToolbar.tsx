@@ -2,13 +2,8 @@ import React from 'react';
 import { useHR } from '../../context/HRContext';
 import { 
   Sparkles, 
-  RotateCcw, 
   Send, 
-  CreditCard, 
-  ShieldCheck, 
-  UserCheck, 
-  SlidersHorizontal,
-  ChevronRight
+  CreditCard 
 } from 'lucide-react';
 
 export const DemoJudgeToolbar: React.FC = () => {
@@ -19,10 +14,14 @@ export const DemoJudgeToolbar: React.FC = () => {
     employees, 
     applyLeave, 
     generateMonthlyPayroll, 
-    resetDemoData, 
     setActiveTab,
     addToast
   } = useHR();
+
+  // Hide the toolbar completely for normal employees
+  if (currentRole !== 'admin') {
+    return null;
+  }
 
   const handleQuickLeaveDemo = () => {
     // Switch to Alex Chen and submit a leave
@@ -65,7 +64,7 @@ export const DemoJudgeToolbar: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={handleQuickLeaveDemo}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600/80 hover:bg-indigo-600 text-white font-medium text-[11px] transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600/80 hover:bg-indigo-600 text-white font-medium text-[11px] transition-colors cursor-pointer"
             title="Simulates an employee submitting a new 4-day leave request"
           >
             <Send className="w-3 h-3" />
@@ -74,20 +73,11 @@ export const DemoJudgeToolbar: React.FC = () => {
 
           <button
             onClick={handleQuickPayrollDemo}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600/80 hover:bg-teal-600 text-white font-medium text-[11px] transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600/80 hover:bg-teal-600 text-white font-medium text-[11px] transition-colors cursor-pointer"
             title="Batch generates August 2026 payslips for all employees"
           >
             <CreditCard className="w-3 h-3" />
             <span className="hidden sm:inline">Run</span> Payroll
-          </button>
-
-          <button
-            onClick={resetDemoData}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-medium text-[11px] border border-slate-700 transition-colors"
-            title="Reset to default mock dataset"
-          >
-            <RotateCcw className="w-3 h-3" />
-            <span className="hidden md:inline">Reset</span>
           </button>
         </div>
 
