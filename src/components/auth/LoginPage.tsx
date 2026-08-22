@@ -27,8 +27,8 @@ export const LoginPage: React.FC = () => {
   } = useHR();
 
   // Sign In state
-  const [signInEmail, setSignInEmail] = useState('sarveshv6413@gmail.com');
-  const [signInPassword, setSignInPassword] = useState('SarvesH@07');
+  const [signInEmail, setSignInEmail] = useState('');
+  const [signInPassword, setSignInPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -257,4 +257,3 @@ export const LoginPage: React.FC = () => {
     </div>
   );
 };
-

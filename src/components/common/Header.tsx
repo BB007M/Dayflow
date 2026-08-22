@@ -102,7 +102,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 px-4 lg:px-6 py-3 transition-colors duration-200">
+    <header className="sticky top-0 z-30 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 lg:px-6 py-3 transition-colors duration-200">
       <div className="flex items-center justify-between gap-3 max-w-7xl mx-auto">
         
         {/* Left: Mobile menu toggle + Logo / Tagline */}
@@ -119,7 +119,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => setActiveTab('dashboard')} 
             className="flex items-center gap-2.5 cursor-pointer group"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-700 via-indigo-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-purple-500/20 group-hover:scale-105 transition-transform">
+            <div className="w-9 h-9 rounded-md bg-black dark:bg-white flex items-center justify-center text-white dark:text-black transition-colors">
               <Layers className="w-5 h-5" />
             </div>
             <div className="flex flex-col">

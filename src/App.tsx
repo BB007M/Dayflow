@@ -79,7 +79,7 @@ const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-purple-500 selection:text-white transition-colors duration-200">
+    <div className="app-shell min-h-screen flex flex-col text-slate-900 dark:text-slate-100 font-sans selection:bg-indigo-600 selection:text-white transition-colors duration-200">
       
       {/* Hackathon Judge Toolbar */}
       <DemoJudgeToolbar />
@@ -88,7 +88,7 @@ const MainLayout: React.FC = () => {
       <Header onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)} />
 
       {/* App Workspace Body */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden app-frame">
         
         {/* Responsive Desktop & Mobile Sidebar */}
         <Sidebar
@@ -97,7 +97,7 @@ const MainLayout: React.FC = () => {
         />
 
         {/* Dynamic Main Workspace Content */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <main className="app-workspace flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {renderActiveView()}
         </main>
       </div>

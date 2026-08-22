@@ -185,21 +185,10 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     return INITIAL_EMPLOYEES;
   });
 
-  const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
-    if (!saved || saved === 'LOGGED_OUT' || saved === 'null' || ['emp-1', 'emp-2', 'emp-3', 'emp-4', 'emp-5', 'emp-6'].includes(saved)) {
-      return 'emp-sarvesh';
-    }
-    return saved;
-  });
-
-  const [sessionToken, setSessionToken] = useState<string | null>(() => {
-    const savedUserId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
-    if (!savedUserId || savedUserId === 'LOGGED_OUT' || savedUserId === 'null') {
-      return null;
-    }
-    return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) || `sess-${Date.now()}`;
-  });
+  // Always start with an unauthenticated session. A user must explicitly sign in
+  // after launching the app; local storage is not treated as login proof.
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
 
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
