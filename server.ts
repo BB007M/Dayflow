@@ -875,6 +875,35 @@ app.post('/api/salary-increments', async (req, res) => {
   return res.json({ success: true, increment: row });
 });
 
+app.get('/api/salary-increments', async (req, res) => {
+  const sb = getSupabase();
+  if (sb) {
+    const { data, error } = await sb
+      .from('salary_increments')
+      .select('*')
+      .order('effective_date', { ascending: false });
+    if (!error && data) {
+      return res.json({
+        increments: data.map((row) => ({
+          id: row.id,
+          employeeId: row.employee_id,
+          employeeName: row.employee_name,
+          previousBasicSalary: Number(row.previous_basic_salary),
+          incrementAmount: Number(row.increment_amount),
+          incrementPercentage: Number(row.increment_percentage),
+          newBasicSalary: Number(row.new_basic_salary),
+          effectiveDate: row.effective_date,
+          reason: row.reason,
+          approvedBy: row.approved_by,
+          createdAt: row.created_at,
+        })),
+      });
+    }
+  }
+
+  return res.json({ increments: [] });
+});
+
 app.post('/api/payslips', async (req, res) => {
   const slip = req.body || {};
   if (!slip.id || !slip.employeeId || !slip.month || !slip.year) {

@@ -13,7 +13,6 @@ import {
   Info,
   Sun,
   Moon,
-  KeyRound
 } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
@@ -24,8 +23,8 @@ export const LoginPage: React.FC = () => {
   } = useHR();
 
   // Sign In state
-  const [signInEmail, setSignInEmail] = useState('sarveshv6413@gmail.com');
-  const [signInPassword, setSignInPassword] = useState('SarvesH@07');
+  const [signInEmail, setSignInEmail] = useState('');
+  const [signInPassword, setSignInPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -44,12 +43,6 @@ export const LoginPage: React.FC = () => {
     if (!success) {
       setErrorMessage('Account not found or invalid credentials. If you are a new employee, please contact your System Administrator.');
     }
-  };
-
-  const fillAdminCredentials = () => {
-    setSignInEmail('sarveshv6413@gmail.com');
-    setSignInPassword('SarvesH@07');
-    setErrorMessage('');
   };
 
   return (
@@ -182,46 +175,6 @@ export const LoginPage: React.FC = () => {
                 <span>{isLoading ? 'Verifying Credentials...' : 'Sign In'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
-
-              {/* Verified Account Quick Access */}
-              <div className="pt-3 border-t border-slate-200 dark:border-slate-800/80">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Verified Account
-                  </span>
-                  <button
-                    type="button"
-                    onClick={fillAdminCredentials}
-                    className="text-[11px] text-purple-600 dark:text-purple-400 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <KeyRound className="w-3 h-3" />
-                    Auto-Fill Sarvesh V
-                  </button>
-                </div>
-
-                <div 
-                  onClick={fillAdminCredentials}
-                  className="p-3 rounded-xl bg-purple-50/80 dark:bg-purple-950/30 hover:bg-purple-100/80 dark:hover:bg-purple-900/40 border border-purple-200 dark:border-purple-800/60 transition-all cursor-pointer flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center font-bold text-xs">
-                      SV
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                        <span>Sarvesh V</span>
-                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-purple-200 dark:bg-purple-500/30 text-purple-800 dark:text-purple-300">
-                          Admin
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">sarveshv6413@gmail.com</div>
-                    </div>
-                  </div>
-                  <div className="text-right text-[10px] text-slate-500 dark:text-slate-400">
-                    <div>Pass: <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">SarvesH@07</span></div>
-                  </div>
-                </div>
-              </div>
 
               {/* RBAC Notice */}
               <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-start gap-2">

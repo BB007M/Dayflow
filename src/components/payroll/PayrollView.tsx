@@ -169,7 +169,7 @@ export const PayrollView: React.FC = () => {
               <span>Salary Increment</span>
             </button>
             <button
-              onClick={() => generateMonthlyPayroll('February 2026')}
+              onClick={() => generateMonthlyPayroll('February', 2026)}
               className="px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-600 text-white font-semibold text-xs shadow-md shadow-teal-500/30 flex items-center gap-1.5 transition-all hover:scale-105"
             >
               <Sparkles className="w-4 h-4" />

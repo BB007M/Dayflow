@@ -226,6 +226,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     if (typeof window !== 'undefined') {
       const path = window.location.pathname;
       if (path === '/admin') return 'admin';
+      if (path === '/increments') return 'increments';
       if (path === '/employees') return 'employees';
       if (path === '/attendance') return 'attendance';
       if (path === '/leaves') return 'leaves';
@@ -253,6 +254,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       if (typeof window !== 'undefined') {
         const path = window.location.pathname;
         if (path === '/admin') setActiveTabState('admin');
+        else if (path === '/increments') setActiveTabState('increments');
         else if (path === '/employees') setActiveTabState('employees');
         else if (path === '/attendance') setActiveTabState('attendance');
         else if (path === '/leaves') setActiveTabState('leaves');
@@ -347,7 +349,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
                 reviewedAt: leave.reviewed_at,
                 adminComments: leave.admin_comments,
               } as LeaveRequest;
-            }).map((leave) => ({
+            }).map((leave: LeaveRequest) => ({
               ...leave,
               employeeAvatar: leave.employeeAvatar || current.find((item) => item.employeeId === leave.employeeId)?.employeeAvatar || '',
             })));
@@ -576,7 +578,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   };
 
   // Sign In with Supabase backend authentication
-  const signIn = async (email: string, role: UserRole, password?: string): Promise<boolean> => {
+  const signIn = async (email: string, role?: UserRole, password?: string): Promise<boolean> => {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',

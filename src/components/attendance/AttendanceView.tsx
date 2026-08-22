@@ -323,10 +323,10 @@ export const AttendanceView: React.FC = () => {
     markAttendanceManual({
       ...regularizeModalRecord,
       status: editStatus,
-      checkInTime: editStatus === 'absent' || editStatus === 'leave' ? null : editCheckIn,
-      checkOutTime: editStatus === 'absent' || editStatus === 'leave' ? null : editCheckOut,
-      totalHoursWorked: editStatus === 'absent' || editStatus === 'leave' ? 0 : editHours,
-      breakMinutes: editStatus === 'absent' || editStatus === 'leave' ? 0 : editBreakMinutes,
+      checkInTime: (editStatus as string) === 'absent' || (editStatus as string) === 'leave' ? null : editCheckIn,
+      checkOutTime: (editStatus as string) === 'absent' || (editStatus as string) === 'leave' ? null : editCheckOut,
+      totalHoursWorked: (editStatus as string) === 'absent' || (editStatus as string) === 'leave' ? 0 : editHours,
+      breakMinutes: (editStatus as string) === 'absent' || (editStatus as string) === 'leave' ? 0 : editBreakMinutes,
       notes: editNotes,
     });
 
@@ -821,10 +821,10 @@ export const AttendanceView: React.FC = () => {
                       return (
                         <tr key={log.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
                           <td className="py-3 px-4 font-mono text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                            {new Date(log.created_at).toLocaleString()}
+                            {new Date(log.created_at ?? log.timestamp).toLocaleString()}
                           </td>
                           <td className="py-3 px-4">
-                            {actionBadge(log.action_type)}
+                            {actionBadge(log.action_type ?? log.actionType)}
                           </td>
                           <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white">
                             {log.employee_name} <span className="text-slate-400 font-normal">({log.employee_id})</span>
@@ -912,7 +912,7 @@ export const AttendanceView: React.FC = () => {
                     <textarea value={editLeaveReason} onChange={(event) => setEditLeaveReason(event.target.value)} rows={3} className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 p-3 text-xs text-slate-900 dark:text-slate-100" required />
                   </div>
                 </>
-              ) : editStatus !== 'absent' && editStatus !== 'leave' && editStatus !== 'weekend' && (
+              ) : (editStatus as string) !== 'absent' && (editStatus as string) !== 'leave' && (editStatus as string) !== 'weekend' && (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <TimeSelector

@@ -25,8 +25,8 @@ export const AuthModal: React.FC = () => {
   } = useHR();
 
   // Sign In form
-  const [signInEmail, setSignInEmail] = useState('sarveshv6413@gmail.com');
-  const [signInPassword, setSignInPassword] = useState('SarvesH@07');
+  const [signInEmail, setSignInEmail] = useState('');
+  const [signInPassword, setSignInPassword] = useState('');
   const [signInRole, setSignInRole] = useState<UserRole>('admin');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');

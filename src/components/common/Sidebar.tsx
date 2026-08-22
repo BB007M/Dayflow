@@ -15,7 +15,8 @@ import {
   ChevronRight,
   ShieldCheck,
   Building2,
-  FileCheck
+  FileCheck,
+  Percent
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -87,6 +88,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: currentRole === 'admin' ? 'Payroll & Salary' : 'My Salary & Payslips',
       icon: Banknote,
       roles: ['admin', 'employee'],
+    },
+    {
+      id: 'increments',
+      label: 'Salary Increments',
+      icon: Percent,
+      roles: ['admin'],
     },
     {
       id: 'analytics',

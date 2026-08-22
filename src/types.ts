@@ -83,6 +83,9 @@ export interface PersonalDetails {
   emergencyContactRelation: string;
   bloodGroup?: string;
   nationality: string;
+  dateOfBirth?: string;
+  state?: string;
+  postalCode?: string;
 }
 
 export interface Employee {
@@ -137,6 +140,13 @@ export interface AttendanceDbLog {
   ipAddress?: string;
   userAgent?: string;
   timestamp: string;
+  employee_id?: string;
+  employee_name?: string;
+  action_type?: string;
+  check_in_time?: string | null;
+  check_out_time?: string | null;
+  total_hours_worked?: number;
+  created_at?: string;
 }
 
 export interface LeaveRequest {
