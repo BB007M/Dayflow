@@ -9,6 +9,7 @@ import { CleanCelebrationModal } from './components/common/CleanCelebrationModal
 import { AuthModal } from './components/auth/AuthModal';
 import { LoginPage } from './components/auth/LoginPage';
 import { AuditLogsDrawer } from './components/common/AuditLogsDrawer';
+import { InteractiveBackground } from './components/common/InteractiveBackground';
 
 import { EmployeeDashboard } from './components/dashboard/EmployeeDashboard';
 import { AdminDashboard } from './components/dashboard/AdminDashboard';
@@ -87,7 +88,8 @@ const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-purple-500 selection:text-white transition-colors duration-200">
+    <div className="min-h-screen flex flex-col app-shell text-slate-900 dark:text-slate-100 font-sans selection:bg-purple-500 selection:text-white transition-colors duration-200">
+      <InteractiveBackground />
       
       {/* Hackathon Judge Toolbar */}
       <DemoJudgeToolbar />
@@ -105,8 +107,10 @@ const MainLayout: React.FC = () => {
         />
 
         {/* Dynamic Main Workspace Content */}
-        <main className="min-w-0 flex-1 overflow-y-auto p-3 sm:p-4 md:p-5 lg:p-8">
-          {renderActiveView()}
+        <main className="min-w-0 flex-1 overflow-y-auto p-3 sm:p-4 md:p-5 lg:p-8 relative">
+          <div key={activeTab} className="workspace-enter max-w-7xl mx-auto">
+            {renderActiveView()}
+          </div>
         </main>
       </div>
 

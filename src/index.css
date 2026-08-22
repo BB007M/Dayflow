@@ -5,6 +5,12 @@
 @layer base {
   :root {
     color-scheme: light;
+    --pointer-x: 52%;
+    --pointer-y: 20%;
+  }
+
+  html {
+    scroll-behavior: smooth;
   }
 
   html.dark {
@@ -26,6 +32,112 @@
   h1, h2, h3, .font-display {
     font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
   }
+}
+
+/* Premium workspace foundation */
+.app-shell {
+  position: relative;
+  isolation: isolate;
+  background: rgb(248 250 252 / 0.72);
+}
+
+.ambient-background {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 58% at 100% 0%, rgb(221 214 254 / 0.56), transparent 70%),
+    radial-gradient(ellipse 58% 46% at 0% 100%, rgb(204 251 241 / 0.4), transparent 72%),
+    #f8fafc;
+}
+
+.ambient-orb {
+  position: absolute;
+  width: 32rem;
+  height: 32rem;
+  border-radius: 999px;
+  filter: blur(48px);
+  opacity: 0.35;
+  will-change: transform;
+  animation: ambient-float 16s ease-in-out infinite alternate;
+}
+
+.ambient-orb-one {
+  top: -15rem;
+  right: 6%;
+  background: #a78bfa;
+}
+
+.ambient-orb-two {
+  bottom: -18rem;
+  left: 15%;
+  width: 26rem;
+  height: 26rem;
+  background: #5eead4;
+  animation-delay: -7s;
+}
+
+.ambient-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.24;
+  background-image:
+    linear-gradient(rgb(100 116 139 / 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(100 116 139 / 0.1) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(to bottom, black, transparent 70%);
+}
+
+.ambient-cursor-glow {
+  position: absolute;
+  left: var(--pointer-x);
+  top: var(--pointer-y);
+  width: 32rem;
+  height: 32rem;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(255 255 255 / 0.6), rgb(196 181 253 / 0.1) 38%, transparent 68%);
+  transition: left 520ms cubic-bezier(.2,.8,.2,1), top 520ms cubic-bezier(.2,.8,.2,1);
+}
+
+.workspace-enter > * {
+  animation: rise-in 540ms cubic-bezier(.2,.8,.2,1) both;
+}
+
+.workspace-enter > *:nth-child(2) { animation-delay: 70ms; }
+.workspace-enter > *:nth-child(3) { animation-delay: 130ms; }
+.workspace-enter > *:nth-child(4) { animation-delay: 190ms; }
+
+@keyframes ambient-float {
+  from { transform: translate3d(-2%, -2%, 0) scale(1); }
+  to { transform: translate3d(7%, 8%, 0) scale(1.12); }
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+html.dark .app-shell {
+  background: rgb(11 17 32 / 0.72);
+}
+
+html.dark .ambient-background {
+  background:
+    radial-gradient(ellipse 72% 58% at 100% 0%, rgb(91 33 182 / 0.26), transparent 70%),
+    radial-gradient(ellipse 58% 46% at 0% 100%, rgb(13 148 136 / 0.14), transparent 72%),
+    #0b1120;
+}
+
+html.dark .ambient-grid { opacity: 0.13; }
+html.dark .ambient-orb { opacity: 0.17; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .ambient-orb, .workspace-enter > * { animation: none !important; }
+  .ambient-cursor-glow { transition: none; }
 }
 
 /* Keep legacy light-only utility classes readable when dark mode is active. */
@@ -95,4 +207,3 @@
     display: block !important;
   }
 }
-

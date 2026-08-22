@@ -97,7 +97,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 px-3 sm:px-4 lg:px-6 py-2.5 sm:py-3 transition-colors duration-200">
+    <header className="sticky top-0 z-30 bg-white/70 dark:bg-slate-950/65 backdrop-blur-xl border-b border-white/70 dark:border-slate-800/80 shadow-[0_1px_0_rgba(15,23,42,0.04)] px-3 sm:px-4 lg:px-6 py-2.5 sm:py-3 transition-colors duration-200">
       <div className="flex min-w-0 items-center justify-between gap-2 sm:gap-3 max-w-7xl mx-auto">
         
         {/* Left: Mobile menu toggle + Logo / Tagline */}
@@ -143,7 +143,7 @@ export const Header: React.FC<HeaderProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => searchQuery.trim() && setIsSearchOpen(true)}
-              className="w-full pl-9 pr-4 py-2 text-xs md:text-sm bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 rounded-xl border border-transparent focus:border-purple-400 dark:focus:border-purple-500 focus:ring-2 focus:ring-purple-100 dark:focus:ring-purple-950 outline-none transition-all"
+              className="w-full pl-9 pr-4 py-2 text-xs md:text-sm bg-white/70 dark:bg-slate-900/70 hover:bg-white dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 rounded-xl border border-slate-200/70 dark:border-slate-700/80 focus:border-purple-400 dark:focus:border-purple-500 focus:ring-2 focus:ring-purple-100 dark:focus:ring-purple-950 outline-none shadow-sm transition-all"
             />
             {searchQuery && (
               <button
