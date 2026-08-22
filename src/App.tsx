@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { HRProvider, useHR } from './context/HRContext';
 import { Header } from './components/common/Header';
 import { Sidebar } from './components/common/Sidebar';
-import { DemoJudgeToolbar } from './components/common/DemoJudgeToolbar';
 import { NotificationDrawer } from './components/common/NotificationDrawer';
 import { ToastContainer } from './components/common/ToastContainer';
 import { CleanCelebrationModal } from './components/common/CleanCelebrationModal';
@@ -18,6 +17,7 @@ import { AddEmployeeModal } from './components/employees/AddEmployeeModal';
 import { AttendanceView } from './components/attendance/AttendanceView';
 import { LeaveManagement } from './components/leaves/LeaveManagement';
 import { PayrollView } from './components/payroll/PayrollView';
+import { SalaryIncrementView } from './components/payroll/SalaryIncrementView';
 import { AnalyticsView } from './components/analytics/AnalyticsView';
 
 const MainLayout: React.FC = () => {
@@ -71,6 +71,8 @@ const MainLayout: React.FC = () => {
         return <LeaveManagement />;
       case 'payroll':
         return <PayrollView />;
+      case 'salary-increment':
+        return <SalaryIncrementView />;
       case 'analytics':
         return <AnalyticsView />;
       default:
@@ -81,14 +83,11 @@ const MainLayout: React.FC = () => {
   return (
     <div className="app-shell console-shell min-h-screen flex flex-col text-slate-900 dark:text-slate-100 font-sans selection:bg-emerald-500 selection:text-black transition-colors duration-200">
       
-      {/* Hackathon Judge Toolbar */}
-      <DemoJudgeToolbar />
-
       {/* Main Header */}
       <Header onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)} />
 
       {/* App Workspace Body */}
-      <div className="flex-1 flex overflow-hidden app-frame">
+      <div className="flex-1 min-h-0 flex overflow-hidden app-frame">
         
         {/* Responsive Desktop & Mobile Sidebar */}
         <Sidebar
@@ -97,7 +96,7 @@ const MainLayout: React.FC = () => {
         />
 
         {/* Dynamic Main Workspace Content */}
-        <main className="app-workspace flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <main className="app-workspace min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {renderActiveView()}
         </main>
       </div>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useHR } from '../../context/HRContext';
 import { 
   LayoutDashboard, 
@@ -14,7 +14,8 @@ import {
   ChevronRight,
   ShieldCheck,
   Building2,
-  FileCheck
+  FileCheck,
+  Percent
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -32,6 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile, 
   onOpenAssistant 
 }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
   const isMobileOpen = isOpenMobile !== undefined ? isOpenMobile : (isOpen || false);
   const handleClose = onCloseMobile || onClose || (() => {});
 
@@ -89,6 +91,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       roles: ['admin', 'employee'],
     },
     {
+      id: 'salary-increment',
+      label: 'Salary Increment',
+      icon: Percent,
+      roles: ['admin'],
+    },
+    {
       id: 'analytics',
       label: 'Reports & Analytics',
       icon: BarChart3,
@@ -117,17 +125,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar Container */}
       <aside
-        className={`console-sidebar fixed top-0 bottom-0 left-0 z-40 w-64 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col border-r border-slate-200 dark:border-slate-800 transition-transform duration-300 ease-in-out lg:w-16 lg:translate-x-0 ${
+        className={`console-sidebar fixed top-0 bottom-0 left-0 z-40 w-64 h-full shrink-0 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col overflow-hidden border-r border-slate-200 dark:border-slate-800 transition-[transform,width] duration-200 ease-in-out ${isExpanded ? 'lg:w-64' : 'lg:w-16'} lg:translate-x-0 ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:static lg:z-10`}
       >
         {/* Brand Header */}
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between lg:justify-center">
+        <div className={`p-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between ${isExpanded ? 'lg:justify-between' : 'lg:justify-center'}`}>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-md bg-emerald-500 flex items-center justify-center text-black">
+            <button
+              type="button"
+              onClick={() => setIsExpanded((expanded) => !expanded)}
+              className="w-8 h-8 rounded-md bg-emerald-500 hover:bg-emerald-400 flex items-center justify-center text-black transition-colors"
+              aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+              title={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+            >
               <Building2 className="w-5 h-5" />
-            </div>
-            <div className="lg:hidden">
+            </button>
+            <div className={isExpanded ? '' : 'lg:hidden'}>
               <div className="font-bold text-lg font-display tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
                 dayflow
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30">
@@ -140,8 +154,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Navigation List */}
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1 lg:px-2">
-          <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider lg:hidden">
+        <div className="flex-1 overflow-hidden px-2 py-3 space-y-0.5">
+          <div className={`px-3 py-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider ${isExpanded ? '' : 'lg:hidden'}`}>
             Main Operations
           </div>
 
@@ -153,18 +167,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
                 title={item.label}
-                className={`relative w-full flex items-center justify-between px-3.5 py-2.5 rounded-md font-medium text-xs sm:text-sm transition-all group lg:justify-center lg:px-0 ${
+                className={`relative w-full flex items-center justify-between px-3.5 py-2 rounded-md font-medium text-xs sm:text-sm transition-all group ${isExpanded ? '' : 'lg:justify-center lg:px-0'} ${
                   isActive
-                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm font-semibold'
+                    ? 'bg-slate-900 text-white shadow-sm font-semibold'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80'
                 }`}
               >
-                <div className="flex items-center gap-3 lg:gap-0">
-                  <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-purple-600 dark:group-hover:text-purple-300'}`} />
-                  <span className="lg:hidden">{item.label}</span>
+                <div className={`flex items-center gap-3 ${isExpanded ? '' : 'lg:gap-0'}`}>
+                  <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-white dark:text-black' : 'text-slate-500 dark:text-slate-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-400'}`} />
+                  <span className={isExpanded ? '' : 'lg:hidden'}>{item.label}</span>
                 </div>
                 {item.badge !== undefined && (
-                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-500 text-white animate-pulse lg:absolute lg:translate-x-3 lg:-translate-y-3">
+                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-500 text-white animate-pulse ${isExpanded ? '' : 'lg:absolute lg:translate-x-3 lg:-translate-y-3'}`}>
                     {item.badge}
                   </span>
                 )}
@@ -172,26 +186,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
 
-          {/* Quick Database Security Status */}
-          <div className="pt-3">
-            <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider lg:hidden">
-              System Infrastructure
-            </div>
-            <div className="mx-2 p-2.5 rounded-md bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-2 lg:justify-center lg:mx-0">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="lg:hidden">Supabase Database Active</span>
-            </div>
-          </div>
         </div>
 
         {/* Current User & Logout Footer */}
-        <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-black space-y-2 lg:p-2">
+        <div className="p-2 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-black space-y-1 lg:p-2">
           {/* Active User Card */}
           {currentUser ? (
             <>
               <div 
                 onClick={() => openEmployeeProfile(currentUser)}
-                className="flex items-center gap-3 p-2 rounded-md bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer border border-slate-200 dark:border-slate-800 transition-colors lg:justify-center"
+                className={`flex items-center gap-3 p-2 rounded-md bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer border border-slate-200 dark:border-slate-800 transition-colors ${isExpanded ? '' : 'lg:justify-center'}`}
                 title="View Profile Details"
               >
                 <img
@@ -199,7 +203,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   alt={currentUser.firstName}
                   className="w-9 h-9 rounded-lg object-cover ring-1 ring-purple-500/40"
                 />
-                <div className="flex-1 min-w-0 lg:hidden">
+                <div className={`flex-1 min-w-0 ${isExpanded ? '' : 'lg:hidden'}`}>
                   <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">
                     {currentUser.firstName} {currentUser.lastName}
                   </div>
@@ -207,16 +211,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     {currentRole === 'admin' ? 'HR Officer (Admin)' : currentUser.jobDetails.designation}
                   </div>
                 </div>
-                <UserCircle className="w-4 h-4 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-300 lg:hidden" />
+                <UserCircle className={`w-4 h-4 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-300 ${isExpanded ? '' : 'lg:hidden'}`} />
               </div>
 
               {/* Logout Button */}
               <button
                 onClick={() => signOut()}
-                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-md bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800/50 text-xs font-semibold text-rose-700 dark:text-rose-300 hover:text-rose-900 dark:hover:text-white transition-all cursor-pointer shadow-sm lg:px-0"
+                className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-md bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800/50 text-xs font-semibold text-rose-700 dark:text-rose-300 hover:text-rose-900 dark:hover:text-white transition-all cursor-pointer shadow-sm ${isExpanded ? '' : 'lg:px-0'}`}
               >
                 <LogOut className="w-3.5 h-3.5 text-rose-400" />
-                <span className="lg:hidden">Sign Out</span>
+                <span className={isExpanded ? '' : 'lg:hidden'}>Sign Out</span>
               </button>
             </>
           ) : (

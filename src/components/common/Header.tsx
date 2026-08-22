@@ -14,8 +14,6 @@ import {
   Menu,
   Database,
   LogIn,
-  Sun,
-  Moon
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -41,9 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
     isNotificationOpen,
     setIsNotificationOpen,
     openAuditDrawer,
-    isDbConnected,
-    theme,
-    toggleTheme
+    isDbConnected
   } = useHR();
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -195,7 +191,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        {/* Right: DB Logs, Punch Status, Theme Toggle, Notifications & Profile */}
+        {/* Right: DB Logs, Punch Status, Notifications & Profile */}
         <div className="flex items-center gap-2 sm:gap-2.5">
           
           {/* Supabase DB Auth Logs Button */}
@@ -206,20 +202,6 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Database className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
             <span className="hidden sm:inline">DB Logs</span>
-          </button>
-
-          {/* Theme Toggle Button (Light / Dark Mode) */}
-          <button
-            onClick={toggleTheme}
-            className="p-2 text-slate-600 dark:text-slate-300 hover:text-purple-600 dark:hover:text-amber-400 bg-slate-100/80 dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-700/80 rounded-xl border border-slate-200 dark:border-slate-700 transition-all cursor-pointer group"
-            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            aria-label={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-          >
-            {theme === 'dark' ? (
-              <Sun className="w-4 h-4 text-amber-400 transition-transform group-hover:rotate-45" />
-            ) : (
-              <Moon className="w-4 h-4 text-slate-600 group-hover:text-purple-600 transition-transform group-hover:-rotate-12" />
-            )}
           </button>
 
           {/* Real-time Punch Status pill */}
@@ -338,26 +320,6 @@ export const Header: React.FC<HeaderProps> = ({
                   >
                     <Briefcase className="w-4 h-4 text-slate-400" />
                     Salary & Payslips
-                  </button>
-
-                  {/* Dark Mode switch inside user menu too for extra convenience */}
-                  <button
-                    onClick={() => {
-                      toggleTheme();
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors text-left cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      {theme === 'dark' ? (
-                        <Sun className="w-4 h-4 text-amber-400" />
-                      ) : (
-                        <Moon className="w-4 h-4 text-slate-400" />
-                      )}
-                      <span>Appearance</span>
-                    </div>
-                    <span className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 uppercase">
-                      {theme === 'dark' ? 'Dark' : 'Light'}
-                    </span>
                   </button>
 
                   <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />

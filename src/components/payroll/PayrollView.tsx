@@ -91,7 +91,7 @@ export const PayrollView: React.FC = () => {
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-teal-950 via-slate-900 to-indigo-950 rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="soft-banner rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-teal-500/30 flex items-center justify-center">

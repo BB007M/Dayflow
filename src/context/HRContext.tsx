@@ -32,9 +32,6 @@ interface HRContextType {
   currentUser: Employee | null;
   currentRole: UserRole;
   isAuthenticated: boolean;
-  theme: 'light' | 'dark';
-  toggleTheme: () => void;
-  setTheme: (theme: 'light' | 'dark') => void;
   employees: Employee[];
   attendanceRecords: AttendanceRecord[];
   attendanceDbLogs: AttendanceDbLog[];
@@ -124,43 +121,12 @@ const STORAGE_KEYS = {
   AUTH_TOKEN: 'dayflow_hrms_auth_token_v2',
   LAST_ACTIVITY: 'dayflow_hrms_last_activity_v2',
   CHECK_IN_STATE: 'dayflow_hrms_checkin_state_v2',
-  THEME: 'dayflow_hrms_theme_v2',
 };
 
 export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Theme State
-  const [theme, setThemeState] = useState<'light' | 'dark'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(STORAGE_KEYS.THEME);
-      if (saved === 'dark' || saved === 'light') return saved;
-      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    return 'light';
-  });
-
-  // Sync theme with HTML document element class list
   useEffect(() => {
-    if (typeof document !== 'undefined') {
-      const root = document.documentElement;
-      if (theme === 'dark') {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
-      try {
-        localStorage.setItem(STORAGE_KEYS.THEME, theme);
-      } catch (err) {
-        console.warn('Could not save theme preference to localStorage', err);
-      }
-    }
-  }, [theme]);
-
-  const toggleTheme = useCallback(() => {
-    setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  }, []);
-
-  const setTheme = useCallback((newTheme: 'light' | 'dark') => {
-    setThemeState(newTheme);
+    document.documentElement.classList.remove('dark');
+    localStorage.removeItem('dayflow_hrms_theme_v2');
   }, []);
 
   // State Initialization
@@ -201,6 +167,42 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     const saved = localStorage.getItem(STORAGE_KEYS.LEAVES);
     return saved ? JSON.parse(saved) : INITIAL_LEAVE_REQUESTS;
   });
+
+  useEffect(() => {
+    const reservedDays = new Map<string, number>();
+    let changed = false;
+    const repairedRequests = leaveRequests.map((leave) => {
+      if (leave.status !== 'Pending' || leave.leaveType === 'Unpaid') return leave;
+
+      const employee = employees.find((emp) => emp.employeeId === leave.employeeId);
+      const balance = employee
+        ? leave.leaveType === 'Paid'
+          ? employee.leaveBalance.paidLeave
+          : leave.leaveType === 'Sick'
+            ? employee.leaveBalance.sickLeave
+            : employee.leaveBalance.casualLeave
+        : null;
+      if (!balance) return leave;
+
+      const key = `${leave.employeeId}:${leave.leaveType}`;
+      const reserved = reservedDays.get(key) || 0;
+      if (reserved + leave.totalDays > balance.remaining) {
+        changed = true;
+        return {
+          ...leave,
+          status: 'Rejected' as const,
+          reviewedBy: 'Dayflow Leave Policy',
+          reviewedAt: new Date().toISOString(),
+          adminComments: `Request exceeds the available ${leave.leaveType.toLowerCase()} leave balance of ${balance.remaining} day${balance.remaining === 1 ? '' : 's'}.`,
+        };
+      }
+
+      reservedDays.set(key, reserved + leave.totalDays);
+      return leave;
+    });
+
+    if (changed) setLeaveRequests(repairedRequests);
+  }, [employees, leaveRequests]);
 
   const [payslips, setPayslips] = useState<Payslip[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.PAYSLIPS);
@@ -955,6 +957,28 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     reason: string;
   }) => {
     if (!currentUser) return;
+
+    const balance = data.leaveType === 'Paid'
+      ? currentUser.leaveBalance.paidLeave
+      : data.leaveType === 'Sick'
+        ? currentUser.leaveBalance.sickLeave
+        : data.leaveType === 'Casual'
+          ? currentUser.leaveBalance.casualLeave
+          : null;
+    const pendingDays = leaveRequests
+      .filter((leave) => leave.employeeId === currentUser.employeeId && leave.leaveType === data.leaveType && leave.status === 'Pending')
+      .reduce((total, leave) => total + leave.totalDays, 0);
+
+    if (balance && data.totalDays + pendingDays > balance.remaining) {
+      const availableDays = Math.max(0, balance.remaining - pendingDays);
+      addToast(
+        'warning',
+        'Insufficient Leave Balance',
+        `You can request ${availableDays} more ${data.leaveType.toLowerCase()} leave day${availableDays === 1 ? '' : 's'}.`
+      );
+      return;
+    }
+
     const newLeave: LeaveRequest = {
       id: `leave-${Date.now()}`,
       employeeId: currentUser.employeeId,
@@ -1006,8 +1030,28 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
   const reviewLeave = (leaveId: string, status: 'Approved' | 'Rejected', comments?: string) => {
     const targetLeave = leaveRequests.find((l) => l.id === leaveId);
-    if (!targetLeave) return;
+    if (!targetLeave || targetLeave.status !== 'Pending') return;
     const reviewer = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'HR Director';
+
+    if (status === 'Approved' && targetLeave.leaveType !== 'Unpaid') {
+      const employee = employees.find((emp) => emp.employeeId === targetLeave.employeeId);
+      const balance = employee
+        ? targetLeave.leaveType === 'Paid'
+          ? employee.leaveBalance.paidLeave
+          : targetLeave.leaveType === 'Sick'
+            ? employee.leaveBalance.sickLeave
+            : employee.leaveBalance.casualLeave
+        : null;
+
+      if (!balance || targetLeave.totalDays > balance.remaining) {
+        addToast(
+          'warning',
+          'Leave Approval Blocked',
+          `${targetLeave.employeeName} has only ${balance?.remaining || 0} ${targetLeave.leaveType.toLowerCase()} leave day${balance?.remaining === 1 ? '' : 's'} remaining.`
+        );
+        return;
+      }
+    }
 
     setLeaveRequests((prev) =>
       prev.map((l) => {
@@ -1029,7 +1073,12 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       setEmployees((prev) =>
         prev.map((emp) => {
           if (emp.employeeId === targetLeave.employeeId) {
-            const currentBal = { ...emp.leaveBalance };
+            const currentBal = {
+              paidLeave: { ...emp.leaveBalance.paidLeave },
+              sickLeave: { ...emp.leaveBalance.sickLeave },
+              casualLeave: { ...emp.leaveBalance.casualLeave },
+              unpaidLeave: { ...emp.leaveBalance.unpaidLeave },
+            };
             if (targetLeave.leaveType === 'Paid') {
               currentBal.paidLeave.used += targetLeave.totalDays;
               currentBal.paidLeave.remaining = Math.max(0, currentBal.paidLeave.total - currentBal.paidLeave.used);
@@ -1457,9 +1506,6 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         currentUser,
         currentRole,
         isAuthenticated,
-        theme,
-        toggleTheme,
-        setTheme,
         employees,
         attendanceRecords,
         attendanceDbLogs,

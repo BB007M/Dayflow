@@ -76,7 +76,7 @@ export const EmployeeDashboard: React.FC = () => {
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       
       {/* Welcome Banner with Live Check-In Punch Widget */}
-      <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+      <div className="soft-banner rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         {/* Abstract background graphics */}
         <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-radial from-purple-500/20 to-transparent pointer-events-none" />
         <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />

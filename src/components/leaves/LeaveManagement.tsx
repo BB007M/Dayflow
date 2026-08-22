@@ -99,14 +99,8 @@ export const LeaveManagement: React.FC = () => {
     const start = new Date(startDate);
     const end = new Date(endDate);
     if (end < start) return 1;
-    let count = 0;
-    const cur = new Date(start);
-    while (cur <= end) {
-      const day = cur.getDay();
-      if (day !== 0 && day !== 6) count++;
-      cur.setDate(cur.getDate() + 1);
-    }
-    return Math.max(count, 1);
+    const millisecondsPerDay = 24 * 60 * 60 * 1000;
+    return Math.floor((end.getTime() - start.getTime()) / millisecondsPerDay) + 1;
   };
 
   const totalDays = calculateTotalDays();
@@ -164,7 +158,7 @@ export const LeaveManagement: React.FC = () => {
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="soft-banner rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-purple-500/30 flex items-center justify-center">

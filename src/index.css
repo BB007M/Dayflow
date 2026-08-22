@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:where(.never-dark, .never-dark *));
 
 @layer base {
   body {
@@ -19,9 +19,7 @@
   }
 
   .dark .app-shell {
-    background-color: #0d0e0e;
-    background-image: radial-gradient(rgb(255 255 255 / 0.07) 0.75px, transparent 0.75px);
-    background-size: 18px 18px;
+    background: #0c1512;
   }
 
   .app-workspace {
@@ -29,7 +27,7 @@
   }
 
   .dark .app-workspace {
-    background: rgb(13 14 14 / 0.72);
+    background: #101c17;
   }
 
   /* Monochrome, high-contrast surfaces inspired by Vercel's product UI. */
@@ -42,7 +40,8 @@
   }
 
   .dark .console-header {
-    background: rgb(13 14 14 / 0.94);
+    background: #0e1915;
+    border-color: #203a2f;
   }
 
   .console-sidebar {
@@ -50,7 +49,8 @@
   }
 
   .dark .console-sidebar {
-    background: #101111;
+    background: #101c17;
+    border-color: #203a2f;
   }
 
   .console-sidebar button {
@@ -82,69 +82,194 @@
   .app-shell .bg-gradient-to-r,
   .app-shell .bg-gradient-to-tr,
   .app-shell .bg-gradient-to-br {
-    background-color: #111111;
+    background-color: #f0fdf4;
     background-image: none;
+    border: 1px solid #d1fae5;
+    box-shadow: none;
+    color: #17211d;
+  }
+
+  .app-shell .bg-gradient-to-r.text-white,
+  .app-shell .bg-gradient-to-tr.text-white,
+  .app-shell .bg-gradient-to-br.text-white,
+  .app-shell .bg-gradient-to-r .text-white,
+  .app-shell .bg-gradient-to-tr .text-white,
+  .app-shell .bg-gradient-to-br .text-white {
+    color: #17211d;
+  }
+
+  .app-shell button.bg-gradient-to-r,
+  .app-shell button.bg-gradient-to-tr,
+  .app-shell button.bg-gradient-to-br {
+    background-color: #059669;
+    border-color: #059669;
+    color: #ffffff;
   }
 
   .dark .app-shell .bg-gradient-to-r,
   .dark .app-shell .bg-gradient-to-tr,
   .dark .app-shell .bg-gradient-to-br {
-    background-color: #ffffff;
+    background-color: #111817;
+    border-color: #26352f;
+    color: #f0fdf4;
+  }
+
+  .dark .app-shell .bg-gradient-to-r.text-white,
+  .dark .app-shell .bg-gradient-to-tr.text-white,
+  .dark .app-shell .bg-gradient-to-br.text-white,
+  .dark .app-shell .bg-gradient-to-r .text-white,
+  .dark .app-shell .bg-gradient-to-tr .text-white,
+  .dark .app-shell .bg-gradient-to-br .text-white {
+    color: #f0fdf4;
   }
 
   .app-shell .bg-purple-600,
   .app-shell .bg-indigo-600 {
-    background-color: #111111;
+    background-color: #059669;
   }
 
-  .dark .app-shell .bg-purple-600,
-  .dark .app-shell .bg-indigo-600 {
-    background-color: #ffffff;
+  .soft-banner {
+    background: #e8f3ef;
+    border: none;
+    color: #17332e;
+    box-shadow: 0 12px 28px rgb(31 65 56 / 0.08);
   }
 
-  .dark .app-shell .bg-purple-600.text-white,
-  .dark .app-shell .bg-indigo-600.text-white,
-  .dark .app-shell .bg-gradient-to-r.text-white,
-  .dark .app-shell .bg-gradient-to-tr.text-white,
-  .dark .app-shell .bg-gradient-to-br.text-white,
-  .dark .app-shell .bg-purple-600 .text-white,
-  .dark .app-shell .bg-indigo-600 .text-white,
-  .dark .app-shell .bg-gradient-to-r .text-white,
-  .dark .app-shell .bg-gradient-to-tr .text-white,
-  .dark .app-shell .bg-gradient-to-br .text-white {
-    color: #111111;
+  .dark .soft-banner {
+    background: #1a3028;
+    color: #e5f1ed;
+    box-shadow: 0 12px 28px rgb(0 0 0 / 0.18);
   }
 
-  .app-shell .text-purple-600,
-  .app-shell .text-purple-700,
-  .app-shell .text-indigo-600,
-  .app-shell .text-indigo-700 {
-    color: #059669;
+  .soft-banner .text-white {
+    color: #17332e !important;
   }
 
-  .dark .app-shell .text-purple-400,
-  .dark .app-shell .text-purple-300,
-  .dark .app-shell .text-indigo-400,
-  .dark .app-shell .text-indigo-300 {
-    color: #34d399;
+  .soft-banner [class*="text-purple-"],
+  .soft-banner [class*="text-slate-"] {
+    color: #52736a !important;
   }
 
-  .app-shell .border-purple-200,
-  .app-shell .border-purple-300,
-  .app-shell .border-purple-400 {
-    border-color: #a7f3d0;
+  .soft-banner [class*="bg-white/"],
+  .soft-banner [class*="bg-purple-"] {
+    background-color: rgb(255 255 255 / 0.62) !important;
+    background-image: none !important;
   }
 
-  .dark .app-shell .border-purple-700,
-  .dark .app-shell .border-purple-800,
-  .dark .app-shell .border-purple-900 {
-    border-color: rgb(16 185 129 / 0.35);
+  .soft-banner [class*="border-white/"],
+  .soft-banner [class*="border-purple-"] {
+    border-color: #b9d8cc !important;
   }
+
+  .soft-banner .text-teal-300,
+  .soft-banner .text-purple-300,
+  .soft-banner [class*="text-teal-"] {
+    color: #168a71 !important;
+  }
+
+}
+
+/* Keep the interface flat and consistent in both color modes. */
+[class*="bg-gradient-"] {
+  background-image: none !important;
+}
+
+button[class*="bg-gradient-"] {
+  background-color: #079b80 !important;
+  color: #ffffff !important;
+}
+
+.dark .app-shell [class*="bg-gradient-"] {
+  background-color: #24463b !important;
+  border-color: #376052 !important;
+  color: #e5f1ed !important;
+}
+
+.dark .app-shell button[class*="bg-gradient-"] {
+  background-color: #079b80 !important;
+  color: #ffffff !important;
+}
+
+.dark body {
+  background: #0a120f;
+  color: #e5f1ed;
+}
+
+.dark [class*="dark:bg-slate-950"],
+.dark [class*="dark:bg-slate-900"] {
+  background-color: #15271f !important;
+}
+
+.dark [class*="dark:bg-slate-800"] {
+  background-color: #1c3329 !important;
+}
+
+.dark [class*="dark:bg-slate-700"] {
+  background-color: #254238 !important;
+}
+
+.dark [class*="dark:border-slate-"] {
+  border-color: #2b493c !important;
+}
+
+.dark .soft-banner [class*="bg-white/"],
+.dark .soft-banner [class*="bg-purple-"] {
+  background-color: rgb(255 255 255 / 0.08) !important;
+}
+
+.dark .soft-banner .text-white {
+  color: #e5f1ed !important;
+}
+
+.dark .soft-banner [class*="text-purple-"],
+.dark .soft-banner [class*="text-slate-"],
+.dark .soft-banner [class*="text-teal-"] {
+  color: #a8c8bd !important;
 }
 
 /* Shared panel fallback: older view components use plain `bg-white` cards.
    Keep those cards and their standard slate text readable whenever dark mode is active. */
 @layer utilities {
+  /* Remove the legacy purple palette across every screen. */
+  .app-shell [class*="bg-purple-"] {
+    background-color: #ecfdf5 !important;
+    background-image: none !important;
+  }
+
+  .dark .app-shell [class*="bg-purple-"] {
+    background-color: rgb(6 78 59 / 0.55) !important;
+  }
+
+  .app-shell [class*="bg-purple-600"],
+  .app-shell [class*="hover:bg-purple-600"]:hover,
+  .app-shell [class*="hover:bg-purple-700"]:hover {
+    background-color: #059669 !important;
+  }
+
+  .app-shell [class*="text-purple-"] {
+    color: #047857 !important;
+  }
+
+  .dark .app-shell [class*="text-purple-"] {
+    color: #6ee7b7 !important;
+  }
+
+  .app-shell [class*="border-purple-"],
+  .app-shell [class*="ring-purple-"] {
+    border-color: #6ee7b7 !important;
+    --tw-ring-color: rgb(16 185 129 / 0.35) !important;
+  }
+
+  .dark .app-shell [class*="border-purple-"],
+  .dark .app-shell [class*="ring-purple-"] {
+    border-color: rgb(16 185 129 / 0.5) !important;
+    --tw-ring-color: rgb(16 185 129 / 0.35) !important;
+  }
+
+  .app-shell [class*="shadow-purple-"] {
+    --tw-shadow-color: rgb(5 150 105 / 0.2) !important;
+  }
+
   .dark div.bg-white {
     @apply bg-slate-900 border-slate-800;
   }
