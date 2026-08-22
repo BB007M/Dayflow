@@ -550,7 +550,12 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
       if (res.ok && data.success) {
         if (data.user) {
-          setEmployees((prev) => [data.user, ...prev]);
+          setEmployees((prev) => {
+            const exists = prev.some((e) => e.id === data.user.id || e.email.toLowerCase() === String(data.user.email).toLowerCase());
+            return exists
+              ? prev.map((e) => (e.id === data.user.id || e.email.toLowerCase() === String(data.user.email).toLowerCase() ? { ...e, ...data.user } : e))
+              : [data.user, ...prev];
+          });
           setCurrentUserId(data.user.id);
         } else {
           // Fallback create
@@ -633,7 +638,8 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         addToast('success', 'Account Stored in Database', `Welcome to Dayflow HRMS, ${payload.firstName}!`);
         return true;
       } else {
-        addToast('error', 'Registration Failed', data.error || 'Could not register user.');
+        const detail = [data.error, data.code, data.details, data.hint].filter(Boolean).join(' | ');
+        addToast('error', 'Registration Failed', detail || 'Could not register user.');
         return false;
       }
     } catch (err) {

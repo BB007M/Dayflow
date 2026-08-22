@@ -84,14 +84,14 @@ export const AuthModal: React.FC = () => {
             {/* DB Status Badge */}
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/10 backdrop-blur-md text-[11px] font-medium text-emerald-200 border border-emerald-400/30">
               <Database className="w-3 h-3 text-emerald-300" />
-              <span>{isDbConnected ? 'Supabase Active' : 'Supabase Connected'}</span>
+              <span>{isDbConnected ? 'Supabase Active' : 'Database Offline'}</span>
             </div>
           </div>
           <h2 className="text-xl font-bold text-white mt-2">
             Sign In to Workspace
           </h2>
           <p className="text-xs text-purple-100 mt-1">
-            Enterprise-grade Supabase authentication & session security.
+            Secure workspace authentication backed by the Dayflow database.
           </p>
         </div>
 

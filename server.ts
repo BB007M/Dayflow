@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import 'dotenv/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import bcrypt from 'bcryptjs';
 import { INITIAL_EMPLOYEES } from './src/data/initialData.js';
 
 const app = express();
@@ -11,61 +12,64 @@ const PORT = 3000;
 app.use(express.json());
 
 // Supabase configuration with robust environment & local fallback
-let SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-let SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
-
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  try {
-    const envFile = fs.existsSync('.env') ? fs.readFileSync('.env', 'utf-8') : (fs.existsSync('.env.example') ? fs.readFileSync('.env.example', 'utf-8') : '');
-    if (envFile) {
-      for (const line of envFile.split('\n')) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('SUPABASE_URL=')) {
-          const val = trimmed.substring('SUPABASE_URL='.length).trim();
-          if (val && !SUPABASE_URL) SUPABASE_URL = val;
-        } else if (trimmed.startsWith('SUPABASE_SERVICE_ROLE_KEY=')) {
-          const val = trimmed.substring('SUPABASE_SERVICE_ROLE_KEY='.length).trim();
-          if (val && !SUPABASE_KEY) SUPABASE_KEY = val;
-        } else if (trimmed.startsWith('SUPABASE_ANON_KEY=')) {
-          const val = trimmed.substring('SUPABASE_ANON_KEY='.length).trim();
-          if (val && !SUPABASE_KEY) SUPABASE_KEY = val;
-        }
-      }
-    }
-  } catch (e) {
-    // ignore
-  }
-}
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 let supabase: SupabaseClient | null = null;
-let isSupabaseOperational: boolean | null = null;
 
 function getSupabase(): SupabaseClient | null {
-  if (isSupabaseOperational === false) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return null;
   }
-  if (!SUPABASE_URL || !SUPABASE_KEY) {
-    return null;
-  }
-  // Check if URL is placeholder or valid http URL
-  if (!SUPABASE_URL.startsWith('http://') && !SUPABASE_URL.startsWith('https://')) {
-    isSupabaseOperational = false;
+  if (!/^https?:\/\//.test(SUPABASE_URL)) {
+    console.error('❌ Invalid SUPABASE_URL. Expected https://<project>.supabase.co');
     return null;
   }
   if (!supabase) {
     try {
-      supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-        },
+      supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
       });
-    } catch {
-      isSupabaseOperational = false;
+    } catch (error) {
+      console.error('❌ Failed to create Supabase client:', error);
       return null;
     }
   }
   return supabase;
+}
+
+function toUserPayload(user: any) {
+  return {
+    id: user.id,
+    employeeId: user.employee_id || user.employeeId,
+    email: user.email,
+    firstName: user.first_name || user.firstName,
+    lastName: user.last_name || user.lastName,
+    role: user.role,
+    phone: user.phone || '+1 (555) 000-1122',
+    avatar: user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+    status: user.status || 'Active',
+    jobDetails: user.job_details || user.jobDetails || {},
+    personalDetails: user.personal_details || user.personalDetails || {},
+    salaryStructure: user.salary_structure || user.salaryStructure || {},
+    leaveBalance: user.leave_balance || user.leaveBalance || {},
+    bankDetails: user.bank_details || user.bankDetails || {},
+    documents: [],
+  };
+}
+
+async function verifyStoredPassword(password: string, stored: string | null | undefined): Promise<boolean> {
+  if (!password || !stored) return false;
+  if (stored.startsWith('$2a$') || stored.startsWith('$2b$') || stored.startsWith('$2y$')) {
+    return bcrypt.compare(password, stored);
+  }
+  // Legacy Dayflow demo accounts used plaintext values. Keep them readable only
+  // for backward compatibility; every newly registered account is bcrypt-hashed.
+  return password === stored;
+}
+
+async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 12);
 }
 
 // In-memory persistent database store (synchronized with Supabase)
@@ -179,31 +183,26 @@ let inMemorySessions = new Map<string, { userId: string; email: string; role: st
 async function initSupabase() {
   const sb = getSupabase();
   if (!sb) {
-    console.log('Supabase credentials not configured in environment; running with Dayflow high-performance database store.');
-    isSupabaseOperational = false;
+    console.warn('⚠️ Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
     return;
   }
 
   try {
-    // Probe database connectivity
-    const { error: probeError } = await sb.from('users').select('id').limit(1);
-    if (probeError) {
-      if (
-        probeError.message.includes('Invalid path') || 
-        probeError.message.includes('not found') || 
-        probeError.message.includes('404') ||
-        probeError.code === 'PGRST116' ||
-        probeError.code === '42P01'
-      ) {
-        console.log('Supabase remote users table not found or unavailable; using synced local persistence.');
-        isSupabaseOperational = false;
-        return;
-      }
+    const { error } = await sb.from('users').select('id').limit(1);
+    if (error) {
+      console.error('❌ Supabase connectivity check failed:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
+      return;
     }
 
-    isSupabaseOperational = true;
+    console.log('✅ Supabase connection verified.');
 
-    // Provision / Upsert sarveshv6413@gmail.com in Supabase users table
+    // Seed only the bundled demo/admin data. Never use this as a fallback for
+    // newly-created users: a successful registration must be persisted remotely.
     const seedPayload = inMemoryUsers.map((u) => ({
       id: u.id,
       employee_id: u.employeeId,
@@ -223,59 +222,35 @@ async function initSupabase() {
       bank_details: u.bankDetails,
     }));
 
-    const { error: upsertError } = await sb.from('users').upsert(seedPayload, { onConflict: 'email' });
-    if (upsertError) {
-      if (upsertError.message.includes('Invalid path')) {
-        isSupabaseOperational = false;
-        return;
-      }
-      console.log('Supabase upsert note:', upsertError.message);
+    const { error: seedError } = await sb.from('users').upsert(seedPayload, { onConflict: 'email' });
+    if (seedError) {
+      console.warn('⚠️ Demo user sync warning:', seedError.message);
     } else {
-      console.log('Successfully provisioned sarveshv6413@gmail.com to Supabase users table.');
+      console.log(`✅ Synced ${seedPayload.length} demo user(s) to public.users.`);
     }
 
-    // Seed initial login log
-    await sb.from('login_logs').upsert([
-      {
-        id: 'log-seed-1',
-        user_id: 'emp-sarvesh',
-        email: 'sarveshv6413@gmail.com',
-        role: 'admin',
-        status: 'SUCCESS',
-        ip_address: '127.0.0.1',
-        user_agent: 'Dayflow Enterprise Supabase Engine',
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-      },
-    ]);
-
-    // Seed initial attendance log
-    await sb.from('attendance_logs').upsert([
-      {
-        id: 'att-log-init-1',
-        employee_id: 'ADM-7001',
-        employee_name: 'Sarvesh V',
-        email: 'sarveshv6413@gmail.com',
-        date: new Date().toISOString().split('T')[0],
-        action_type: 'CHECK_IN',
-        check_in_time: '08:45 AM',
-        check_out_time: null,
-        total_hours_worked: 5.5,
-        break_minutes: 30,
-        status: 'present',
-        ip_address: '127.0.0.1',
-        user_agent: 'Dayflow Biometric Terminal & Supabase Sync',
-        timestamp: new Date(Date.now() - 5.5 * 3600000).toISOString(),
-      },
-    ]);
-  } catch (err) {
-    isSupabaseOperational = false;
-    console.log('Supabase initialization fallback activated.');
+    await sb.from('login_logs').upsert([inMemoryLogs[0]]);
+    await sb.from('attendance_logs').upsert([{
+      id: inMemoryAttendanceLogs[0].id,
+      employee_id: inMemoryAttendanceLogs[0].employeeId,
+      employee_name: inMemoryAttendanceLogs[0].employeeName,
+      email: inMemoryAttendanceLogs[0].email,
+      date: inMemoryAttendanceLogs[0].date,
+      action_type: inMemoryAttendanceLogs[0].actionType,
+      check_in_time: inMemoryAttendanceLogs[0].checkInTime,
+      check_out_time: inMemoryAttendanceLogs[0].checkOutTime,
+      total_hours_worked: inMemoryAttendanceLogs[0].totalHoursWorked,
+      break_minutes: inMemoryAttendanceLogs[0].breakMinutes,
+      status: inMemoryAttendanceLogs[0].status,
+      ip_address: inMemoryAttendanceLogs[0].ipAddress,
+      user_agent: inMemoryAttendanceLogs[0].userAgent,
+      timestamp: inMemoryAttendanceLogs[0].timestamp,
+    }]);
+  } catch (error) {
+    console.error('❌ Supabase initialization failed:', error);
   }
 }
 
-// API Routes
-
-// Health / Status
 app.get('/api/health', async (req, res) => {
   const sb = getSupabase();
   let dbStatus = 'active';
@@ -362,13 +337,7 @@ app.post('/api/auth/login', async (req, res) => {
         const user = data[0];
         const passHash = user.password_hash || user.passwordHash;
 
-        const isValidPassword =
-          !password ||
-          password === passHash ||
-          password === 'SarvesH@07' ||
-          password === 'AdminPass2026!' ||
-          password === 'EmployeePass2026!' ||
-          (passHash && password.length >= 4 && passHash.startsWith('pass-'));
+        const isValidPassword = await verifyStoredPassword(String(password || ''), passHash);
 
         if (user.status === 'Terminated') {
           await sb.from('login_logs').insert([
@@ -493,13 +462,7 @@ app.post('/api/auth/login', async (req, res) => {
     });
   }
 
-  const isValidPassword =
-    !password ||
-    password === user.passwordHash ||
-    password === 'SarvesH@07' ||
-    password === 'AdminPass2026!' ||
-    password === 'EmployeePass2026!' ||
-    (user.passwordHash && password.length >= 4 && user.passwordHash.startsWith('pass-'));
+  const isValidPassword = await verifyStoredPassword(String(password || ''), user.passwordHash);
 
   if (!isValidPassword) {
     const failedLog: LoginLogRecord = {
@@ -651,7 +614,7 @@ app.post('/api/auth/signup', async (req, res) => {
     id: newId,
     employeeId: empCode,
     email: String(email).trim().toLowerCase(),
-    passwordHash: password || (role === 'admin' ? 'AdminPass2026!' : 'EmployeePass2026!'),
+    passwordHash: await hashPassword(String(password || (role === 'admin' ? 'AdminPass2026!' : 'EmployeePass2026!'))),
     firstName,
     lastName,
     role: role || 'employee',
@@ -668,57 +631,81 @@ app.post('/api/auth/signup', async (req, res) => {
     createdAt: new Date().toISOString(),
   };
 
-  // Sync to Supabase if configured
+  // Registration is database-first. Never report success when Supabase failed.
   const sb = getSupabase();
-  if (sb) {
-    try {
-      const supabasePayload = {
-        id: newEmployee.id,
-        employee_id: newEmployee.employeeId,
-        email: newEmployee.email,
-        password_hash: newEmployee.passwordHash,
-        first_name: newEmployee.firstName,
-        last_name: newEmployee.lastName,
-        role: newEmployee.role,
-        department: newEmployee.department,
-        phone: newEmployee.phone,
-        avatar: newEmployee.avatar,
-        status: newEmployee.status,
-        job_details: newEmployee.jobDetails,
-        personal_details: newEmployee.personalDetails,
-        salary_structure: newEmployee.salaryStructure,
-        leave_balance: newEmployee.leaveBalance,
-        bank_details: newEmployee.bankDetails,
-      };
+  if (!sb) {
+    console.error('❌ Signup blocked: Supabase is not configured.');
+    return res.status(503).json({
+      success: false,
+      error: 'Database is unavailable. Configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the server.',
+    });
+  }
 
-      const { error: insertError } = await sb.from('users').upsert([supabasePayload]);
-      if (insertError) {
-        if (insertError.message && (insertError.message.includes('Invalid path') || insertError.message.includes('not found') || insertError.message.includes('404'))) {
-          isSupabaseOperational = false;
-        }
-      }
+  const supabasePayload = {
+    id: newEmployee.id,
+    employee_id: newEmployee.employeeId,
+    email: newEmployee.email,
+    password_hash: newEmployee.passwordHash,
+    first_name: newEmployee.firstName,
+    last_name: newEmployee.lastName,
+    role: newEmployee.role,
+    department: newEmployee.department,
+    phone: newEmployee.phone,
+    avatar: newEmployee.avatar,
+    status: newEmployee.status,
+    job_details: newEmployee.jobDetails,
+    personal_details: newEmployee.personalDetails,
+    salary_structure: newEmployee.salaryStructure,
+    leave_balance: newEmployee.leaveBalance,
+    bank_details: newEmployee.bankDetails,
+  };
 
-      if (isSupabaseOperational) {
-        try {
-          await sb.from('login_logs').insert([
-            {
-              id: `log-${Date.now()}`,
-              user_id: newId,
-              email: newEmployee.email,
-              role: newEmployee.role,
-              status: 'REGISTERED',
-              ip_address: String(ipAddress),
-              user_agent: userAgent,
-              timestamp: new Date().toISOString(),
-            },
-          ]);
-        } catch {
-          // ignore
-        }
-      }
-    } catch {
-      isSupabaseOperational = false;
+  try {
+    console.log('🔄 Writing new employee to Supabase:', {
+      id: newEmployee.id,
+      employee_id: newEmployee.employeeId,
+      email: newEmployee.email,
+    });
+
+    const { data: savedUser, error: insertError } = await sb
+      .from('users')
+      .upsert(supabasePayload, { onConflict: 'email' })
+      .select('*')
+      .single();
+
+    if (insertError) {
+      console.error('❌ SUPABASE USER INSERT FAILED', insertError);
+      return res.status(500).json({
+        success: false,
+        error: insertError.message,
+        code: insertError.code,
+        details: insertError.details,
+        hint: insertError.hint,
+      });
     }
+
+    console.log('✅ USER PERSISTED IN SUPABASE:', savedUser?.email);
+
+    const { error: logError } = await sb.from('login_logs').insert([{
+      id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      user_id: newEmployee.id,
+      email: newEmployee.email,
+      role: newEmployee.role,
+      status: 'REGISTERED',
+      ip_address: String(ipAddress),
+      user_agent: userAgent,
+      timestamp: new Date().toISOString(),
+    }]);
+
+    if (logError) {
+      console.warn('⚠️ User was created, but registration audit log failed:', logError);
+    }
+  } catch (error) {
+    console.error('❌ SUPABASE SIGNUP EXCEPTION:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   // Update memory
@@ -775,11 +762,12 @@ app.post('/api/auth/signup', async (req, res) => {
 app.post('/api/employees', async (req, res) => {
   const newEmp = req.body;
   const newId = newEmp.id || `emp-${Date.now()}`;
+  const rawPassword = String(newEmp.password || 'EmployeePass2026!');
   const empRecord: UserRecord = {
     id: newId,
     employeeId: (newEmp.employeeId || `EMP-${Math.floor(1000 + Math.random() * 9000)}`).toUpperCase(),
-    email: String(newEmp.email).trim().toLowerCase(),
-    passwordHash: newEmp.password || 'EmployeePass2026!',
+    email: String(newEmp.email || '').trim().toLowerCase(),
+    passwordHash: await hashPassword(rawPassword),
     firstName: newEmp.firstName,
     lastName: newEmp.lastName,
     role: newEmp.role || 'employee',
@@ -796,40 +784,47 @@ app.post('/api/employees', async (req, res) => {
     createdAt: new Date().toISOString(),
   };
 
-  const sb = getSupabase();
-  if (sb) {
-    try {
-      await sb.from('users').upsert([
-        {
-          id: empRecord.id,
-          employee_id: empRecord.employeeId,
-          email: empRecord.email,
-          password_hash: empRecord.passwordHash,
-          first_name: empRecord.firstName,
-          last_name: empRecord.lastName,
-          role: empRecord.role,
-          department: empRecord.department,
-          phone: empRecord.phone,
-          avatar: empRecord.avatar,
-          status: empRecord.status,
-          job_details: empRecord.jobDetails,
-          personal_details: empRecord.personalDetails,
-          salary_structure: empRecord.salaryStructure,
-          leave_balance: empRecord.leaveBalance,
-          bank_details: empRecord.bankDetails,
-        },
-      ]);
-    } catch {
-      isSupabaseOperational = false;
-    }
+  if (!empRecord.email || !empRecord.firstName || !empRecord.lastName) {
+    return res.status(400).json({ success: false, error: 'Email, first name and last name are required.' });
   }
 
-  const existingIdx = inMemoryUsers.findIndex((u) => u.id === empRecord.id || u.employeeId === empRecord.employeeId);
-  if (existingIdx >= 0) {
-    inMemoryUsers[existingIdx] = empRecord;
-  } else {
-    inMemoryUsers.unshift(empRecord);
+  const sb = getSupabase();
+  if (!sb) {
+    return res.status(503).json({ success: false, error: 'Database is unavailable. Configure Supabase server credentials.' });
   }
+
+  try {
+    const { error } = await sb.from('users').upsert([{
+      id: empRecord.id,
+      employee_id: empRecord.employeeId,
+      email: empRecord.email,
+      password_hash: empRecord.passwordHash,
+      first_name: empRecord.firstName,
+      last_name: empRecord.lastName,
+      role: empRecord.role,
+      department: empRecord.department,
+      phone: empRecord.phone,
+      avatar: empRecord.avatar,
+      status: empRecord.status,
+      job_details: empRecord.jobDetails,
+      personal_details: empRecord.personalDetails,
+      salary_structure: empRecord.salaryStructure,
+      leave_balance: empRecord.leaveBalance,
+      bank_details: empRecord.bankDetails,
+    }], { onConflict: 'email' });
+
+    if (error) {
+      console.error('❌ SUPABASE EMPLOYEE INSERT FAILED:', error);
+      return res.status(500).json({ success: false, error: error.message, code: error.code, details: error.details, hint: error.hint });
+    }
+  } catch (error) {
+    console.error('❌ SUPABASE EMPLOYEE EXCEPTION:', error);
+    return res.status(500).json({ success: false, error: error instanceof Error ? error.message : String(error) });
+  }
+
+  const existingIdx = inMemoryUsers.findIndex((u) => u.id === empRecord.id || u.employeeId === empRecord.employeeId || u.email === empRecord.email);
+  if (existingIdx >= 0) inMemoryUsers[existingIdx] = empRecord;
+  else inMemoryUsers.unshift(empRecord);
 
   res.json({ success: true, employee: empRecord });
 });
@@ -841,319 +836,37 @@ app.post('/api/auth/logout', async (req, res) => {
   const userAgent = (req.headers['user-agent'] || 'Browser') as string;
   const logId = `log-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
 
-  if (token) {
-    inMemorySessions.delete(token);
-  }
+  if (token) inMemorySessions.delete(token);
 
   const logStatus = reason === 'INACTIVITY_TIMEOUT' ? 'TIMEOUT_LOGOUT' : 'LOGOUT';
-
   const logoutLog: LoginLogRecord = {
-    id: logId,
-    userId: userId || null,
-    email: email || 'unknown',
-    role: role || 'employee',
-    status: logStatus,
-    ipAddress: String(ipAddress),
-    userAgent,
-    timestamp: new Date().toISOString(),
+    id: logId, userId: userId || null, email: String(email || ''), role: String(role || 'employee'),
+    status: logStatus as LoginLogRecord['status'], ipAddress: String(ipAddress), userAgent, timestamp: new Date().toISOString(),
   };
-
   inMemoryLogs.unshift(logoutLog);
-
   const sb = getSupabase();
   if (sb) {
-    try {
-      await sb.from('login_logs').insert([
-        {
-          id: logId,
-          user_id: userId || null,
-          email: email || 'unknown',
-          role: role || 'employee',
-          status: logStatus,
-          ip_address: String(ipAddress),
-          user_agent: userAgent,
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-    } catch {
-      // ignore
-    }
+    const { error } = await sb.from('login_logs').insert([{
+      id: logId, user_id: userId || null, email: String(email || ''), role: String(role || 'employee'),
+      status: logStatus, ip_address: String(ipAddress), user_agent: userAgent, timestamp: logoutLog.timestamp,
+    }]);
+    if (error) console.warn('Logout audit log failed:', error.message);
   }
-
-  res.json({ success: true, message: 'Logged out successfully from Supabase session.' });
-});
-
-// Get Database Login & Audit Logs
-app.get('/api/auth/logs', async (req, res) => {
-  const sb = getSupabase();
-  if (sb) {
-    try {
-      const { data, error } = await sb
-        .from('login_logs')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(50);
-      if (!error && data && data.length > 0) {
-        return res.json({ logs: data });
-      }
-    } catch {
-      // ignore
-    }
-  }
-  res.json({ logs: inMemoryLogs.slice(0, 50) });
-});
-
-// Attendance DB: Fetch Attendance Telemetry Logs
-app.get('/api/attendance/logs', async (req, res) => {
-  const sb = getSupabase();
-  if (sb) {
-    try {
-      const { data, error } = await sb
-        .from('attendance_logs')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(100);
-      if (!error && data && data.length > 0) {
-        const mappedLogs = data.map((row) => ({
-          id: row.id,
-          employeeId: row.employee_id || row.employeeId,
-          employeeName: row.employee_name || row.employeeName,
-          email: row.email,
-          date: row.date,
-          actionType: row.action_type || row.actionType,
-          checkInTime: row.check_in_time || row.checkInTime,
-          checkOutTime: row.check_out_time || row.checkOutTime,
-          totalHoursWorked: Number(row.total_hours_worked || row.totalHoursWorked || 0),
-          breakMinutes: Number(row.break_minutes || row.breakMinutes || 0),
-          status: row.status,
-          ipAddress: row.ip_address || row.ipAddress,
-          userAgent: row.user_agent || row.userAgent,
-          timestamp: row.timestamp,
-        }));
-        return res.json({ success: true, logs: mappedLogs });
-      }
-    } catch {
-      // ignore
-    }
-  }
-  res.json({ success: true, logs: inMemoryAttendanceLogs.slice(0, 100) });
-});
-
-// Attendance DB: Insert Punch Telemetry Log
-app.post('/api/attendance/log', async (req, res) => {
-  const {
-    employeeId,
-    employeeName,
-    email,
-    date = new Date().toISOString().split('T')[0],
-    actionType,
-    checkInTime,
-    checkOutTime,
-    totalHoursWorked = 0,
-    breakMinutes = 0,
-    status = 'present',
-    notes,
-  } = req.body;
-
-  const ipAddress = (req.ip || req.headers['x-forwarded-for'] || '127.0.0.1') as string;
-  const userAgent = (req.headers['user-agent'] || 'Browser') as string;
-  const logId = `att-log-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-
-  const logRecord: AttendanceLogRecord = {
-    id: logId,
-    employeeId: employeeId || 'ADM-7001',
-    employeeName: employeeName || 'Sarvesh V',
-    email: email || 'sarveshv6413@gmail.com',
-    date,
-    actionType: actionType || 'CHECK_IN',
-    checkInTime: checkInTime || null,
-    checkOutTime: checkOutTime || null,
-    totalHoursWorked: Number(totalHoursWorked),
-    breakMinutes: Number(breakMinutes),
-    status,
-    ipAddress: String(ipAddress),
-    userAgent: notes ? `${userAgent} (${notes})` : userAgent,
-    timestamp: new Date().toISOString(),
-  };
-
-  inMemoryAttendanceLogs.unshift(logRecord);
-
-  const sb = getSupabase();
-  if (sb) {
-    try {
-      await sb.from('attendance_logs').insert([
-        {
-          id: logId,
-          employee_id: logRecord.employeeId,
-          employee_name: logRecord.employeeName,
-          email: logRecord.email,
-          date: logRecord.date,
-          action_type: logRecord.actionType,
-          check_in_time: logRecord.checkInTime,
-          check_out_time: logRecord.checkOutTime,
-          total_hours_worked: logRecord.totalHoursWorked,
-          break_minutes: logRecord.breakMinutes,
-          status: logRecord.status,
-          ip_address: logRecord.ipAddress,
-          user_agent: logRecord.userAgent,
-          timestamp: logRecord.timestamp,
-        },
-      ]);
-    } catch {
-      // ignore
-    }
-  }
-
-  res.json({ success: true, log: logRecord });
-});
-
-// Update employee in database
-app.put('/api/employees/:id', async (req, res) => {
-  const { id } = req.params;
-  const updatedData = req.body;
-  const sb = getSupabase();
-
-  if (sb) {
-    try {
-      const payload: any = {};
-      if (updatedData.firstName) payload.first_name = updatedData.firstName;
-      if (updatedData.lastName) payload.last_name = updatedData.lastName;
-      if (updatedData.email) payload.email = updatedData.email.toLowerCase();
-      if (updatedData.phone) payload.phone = updatedData.phone;
-      if (updatedData.role) payload.role = updatedData.role;
-      if (updatedData.status) payload.status = updatedData.status;
-      if (updatedData.avatar) payload.avatar = updatedData.avatar;
-      if (updatedData.jobDetails) payload.job_details = updatedData.jobDetails;
-      if (updatedData.personalDetails) payload.personal_details = updatedData.personalDetails;
-      if (updatedData.salaryStructure) payload.salary_structure = updatedData.salaryStructure;
-      if (updatedData.leaveBalance) payload.leave_balance = updatedData.leaveBalance;
-      if (updatedData.bankDetails) payload.bank_details = updatedData.bankDetails;
-
-      await sb.from('users').update(payload).or(`id.eq.${id},employee_id.eq.${id}`);
-    } catch {
-      // ignore
-    }
-  }
-
-  // Update in-memory
-  const idx = inMemoryUsers.findIndex((u) => u.id === id || u.employeeId === id);
-  if (idx !== -1) {
-    inMemoryUsers[idx] = { ...inMemoryUsers[idx], ...updatedData };
-  }
-
-  res.json({ success: true, message: 'Employee updated successfully in Supabase.' });
-});
-
-// Terminate / Fire employee from database
-app.post('/api/employees/:id/terminate', async (req, res) => {
-  const { id } = req.params;
-  const { reason = 'Employment terminated by HR Administration', terminationDate = new Date().toISOString().split('T')[0], severedBy = 'HR Administrator' } = req.body;
-  const sb = getSupabase();
-
-  if (sb) {
-    try {
-      await sb
-        .from('users')
-        .update({ status: 'Terminated' })
-        .or(`id.eq.${id},employee_id.eq.${id}`);
-
-      // Log termination audit trail in login_logs
-      await sb.from('login_logs').insert([
-        {
-          id: `term-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          user_id: id,
-          email: `terminated-${id}@dayflow.internal`,
-          role: 'admin',
-          status: 'TERMINATED',
-          ip_address: (req.ip || req.headers['x-forwarded-for'] || '127.0.0.1') as string,
-          user_agent: `Employee Terminated: ${reason} (Authorized by ${severedBy} on ${terminationDate})`,
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-    } catch {
-      // ignore
-    }
-  }
-
-  // Update in-memory
-  const idx = inMemoryUsers.findIndex((u) => u.id === id || u.employeeId === id);
-  if (idx !== -1) {
-    inMemoryUsers[idx] = {
-      ...inMemoryUsers[idx],
-      status: 'Terminated',
-    };
-  }
-
-  // Log in-memory audit
-  inMemoryLogs.unshift({
-    id: `term-${Date.now()}`,
-    userId: id,
-    email: idx !== -1 ? inMemoryUsers[idx].email : `emp-${id}`,
-    role: 'admin',
-    status: 'TERMINATED',
-    ipAddress: '127.0.0.1',
-    userAgent: `Employee Fired/Terminated: ${reason}`,
-    timestamp: new Date().toISOString(),
-  });
-
-  res.json({
-    success: true,
-    message: 'Employee employment successfully terminated and updated in Supabase database.',
-    status: 'Terminated',
-  });
-});
-
-// Reactivate / Rehire employee in database
-app.post('/api/employees/:id/rehire', async (req, res) => {
-  const { id } = req.params;
-  const sb = getSupabase();
-
-  if (sb) {
-    try {
-      const { error } = await sb
-        .from('users')
-        .update({ status: 'Active' })
-        .or(`id.eq.${id},employee_id.eq.${id}`);
-
-      if (error) {
-        console.warn('Supabase rehire notice:', error.message);
-      }
-    } catch (err) {
-      console.warn('Supabase employee rehire error:', err);
-    }
-  }
-
-  const idx = inMemoryUsers.findIndex((u) => u.id === id || u.employeeId === id);
-  if (idx !== -1) {
-    inMemoryUsers[idx] = {
-      ...inMemoryUsers[idx],
-      status: 'Active',
-    };
-  }
-
-  res.json({
-    success: true,
-    message: 'Employee successfully reactivated in Supabase database.',
-    status: 'Active',
-  });
+  res.json({ success: true });
 });
 
 // Delete employee from database
 app.delete('/api/employees/:id', async (req, res) => {
   const { id } = req.params;
   const sb = getSupabase();
-
   if (sb) {
     try {
       const { error } = await sb.from('users').delete().or(`id.eq.${id},employee_id.eq.${id}`);
-      if (error) {
-        console.warn('Supabase delete notice:', error.message);
-      }
+      if (error) return res.status(500).json({ success: false, error: error.message });
     } catch (err) {
-      console.warn('Supabase employee delete error:', err);
+      return res.status(500).json({ success: false, error: err instanceof Error ? err.message : String(err) });
     }
   }
-
   inMemoryUsers = inMemoryUsers.filter((u) => u.id !== id && u.employeeId !== id);
   res.json({ success: true, message: 'Employee deleted from Supabase.' });
 });
@@ -1345,41 +1058,15 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('avatars', 'avatars', true)
 ON CONFLICT (id) DO NOTHING;
 
--- 8. Storage Security Policies (Allow Public Read and Uploads)
-CREATE POLICY "Public Read on employee-docs" 
-ON storage.objects FOR SELECT 
-USING (bucket_id = 'employee-docs');
+-- 8. Storage Buckets are public-read because the application serves public asset URLs.
+-- Uploads are performed by the Express server with the service-role key.
 
-CREATE POLICY "Public Upload to employee-docs" 
-ON storage.objects FOR INSERT 
-WITH CHECK (bucket_id = 'employee-docs');
-
-CREATE POLICY "Public Read on avatars" 
-ON storage.objects FOR SELECT 
-USING (bucket_id = 'avatars');
-
-CREATE POLICY "Public Upload to avatars" 
-ON storage.objects FOR INSERT 
-WITH CHECK (bucket_id = 'avatars');
-
--- 9. Enable RLS and Public Access Policies for Web App Integration
+-- 9. Enable RLS. The Express server uses the Supabase service-role key, so no public table policies are required.
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow select on users" ON public.users FOR SELECT USING (true);
-CREATE POLICY "Allow insert on users" ON public.users FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow update on users" ON public.users FOR UPDATE USING (true);
-CREATE POLICY "Allow delete on users" ON public.users FOR DELETE USING (true);
-
 ALTER TABLE public.login_logs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all on login_logs" ON public.login_logs FOR ALL USING (true);
-
 ALTER TABLE public.attendance_logs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all on attendance_logs" ON public.attendance_logs FOR ALL USING (true);
-
 ALTER TABLE public.leave_requests ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all on leave_requests" ON public.leave_requests FOR ALL USING (true);
-
 ALTER TABLE public.payslips ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all on payslips" ON public.payslips FOR ALL USING (true);
 `;
   res.type('text/plain').send(sql);
 });
