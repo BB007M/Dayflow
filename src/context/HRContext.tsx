@@ -3,6 +3,7 @@ import {
   Employee, 
   UserRole, 
   AttendanceRecord, 
+  AttendanceDbLog,
   LeaveRequest, 
   Payslip, 
   NotificationItem, 
@@ -31,8 +32,12 @@ interface HRContextType {
   currentUser: Employee | null;
   currentRole: UserRole;
   isAuthenticated: boolean;
+  theme: 'light' | 'dark';
+  toggleTheme: () => void;
+  setTheme: (theme: 'light' | 'dark') => void;
   employees: Employee[];
   attendanceRecords: AttendanceRecord[];
+  attendanceDbLogs: AttendanceDbLog[];
   leaveRequests: LeaveRequest[];
   payslips: Payslip[];
   notifications: NotificationItem[];
@@ -61,12 +66,13 @@ interface HRContextType {
   switchRole: (role: UserRole) => void;
   openAuthModal: (mode?: 'signin' | 'signup') => void;
   closeAuthModal: () => void;
-  signIn: (email: string, role: UserRole, password?: string) => Promise<boolean>;
+  signIn: (email: string, role?: UserRole, password?: string) => Promise<boolean>;
   signUp: (payload: { employeeId: string; email: string; firstName: string; lastName: string; role: UserRole; department: Department; password?: string }) => Promise<boolean>;
-  signOut: () => Promise<void>;
+  signOut: (reason?: string) => Promise<void>;
   openAuditDrawer: () => void;
   closeAuditDrawer: () => void;
   refreshAuditLogs: () => Promise<void>;
+  refreshAttendanceLogs: () => Promise<void>;
   
   // Attendance
   checkIn: () => void;
@@ -91,6 +97,9 @@ interface HRContextType {
   updateEmployee: (updated: Employee) => void;
   addNewEmployee: (newEmployee: Omit<Employee, 'id'>, initialPassword?: string) => Promise<void>;
   updateSalaryStructure: (employeeId: string, structure: SalaryStructure) => void;
+  terminateEmployee: (employeeId: string, reason?: string, notes?: string) => Promise<boolean>;
+  rehireEmployee: (employeeId: string) => Promise<boolean>;
+  deleteEmployee: (employeeId: string) => Promise<boolean>;
   
   // Payroll
   generateMonthlyPayroll: (month: string, year: number) => void;
@@ -113,20 +122,73 @@ const STORAGE_KEYS = {
   NOTIFICATIONS: 'dayflow_hrms_notifications_v2',
   CURRENT_USER_ID: 'dayflow_hrms_current_user_id_v2',
   AUTH_TOKEN: 'dayflow_hrms_auth_token_v2',
+  LAST_ACTIVITY: 'dayflow_hrms_last_activity_v2',
   CHECK_IN_STATE: 'dayflow_hrms_checkin_state_v2',
+  THEME: 'dayflow_hrms_theme_v2',
 };
 
 export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Theme State
+  const [theme, setThemeState] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(STORAGE_KEYS.THEME);
+      if (saved === 'dark' || saved === 'light') return saved;
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return 'light';
+  });
+
+  // Sync theme with HTML document element class list
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const root = document.documentElement;
+      if (theme === 'dark') {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+      try {
+        localStorage.setItem(STORAGE_KEYS.THEME, theme);
+      } catch (err) {
+        console.warn('Could not save theme preference to localStorage', err);
+      }
+    }
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  }, []);
+
+  const setTheme = useCallback((newTheme: 'light' | 'dark') => {
+    setThemeState(newTheme);
+  }, []);
+
   // State Initialization
   const [employees, setEmployees] = useState<Employee[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.EMPLOYEES);
-    return saved ? JSON.parse(saved) : INITIAL_EMPLOYEES;
+    if (saved) {
+      try {
+        const parsed: Employee[] = JSON.parse(saved);
+        const filtered = parsed.filter(
+          (e) => !['sarah.jenkins@dayflow.corp', 'alex.chen@dayflow.corp', 'marcus.vance@dayflow.corp', 'elena.rostova@dayflow.corp', 'priya.sharma@dayflow.corp', 'david.kim@dayflow.corp'].includes(e.email.toLowerCase())
+        );
+        if (filtered.length > 0) {
+          if (!filtered.some(e => e.email.toLowerCase() === 'sarveshv6413@gmail.com')) {
+            filtered.unshift(INITIAL_EMPLOYEES[0]);
+          }
+          return filtered;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return INITIAL_EMPLOYEES;
   });
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
-    if (!saved || saved === 'LOGGED_OUT' || saved === 'null') {
-      return null;
+    if (!saved || saved === 'LOGGED_OUT' || saved === 'null' || ['emp-1', 'emp-2', 'emp-3', 'emp-4', 'emp-5', 'emp-6'].includes(saved)) {
+      return 'emp-sarvesh';
     }
     return saved;
   });
@@ -136,13 +198,15 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     if (!savedUserId || savedUserId === 'LOGGED_OUT' || savedUserId === 'null') {
       return null;
     }
-    return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) || `sess-${Date.now()}`;
   });
 
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
     return saved ? JSON.parse(saved) : generateInitialAttendance();
   });
+
+  const [attendanceDbLogs, setAttendanceDbLogs] = useState<AttendanceDbLog[]>([]);
 
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.LEAVES);
@@ -264,7 +328,22 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     };
     syncDatabaseState();
     refreshAuditLogs();
+    refreshAttendanceLogs();
   }, []);
+
+  const refreshAttendanceLogs = async () => {
+    try {
+      const res = await fetch('/api/attendance/logs');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.logs && Array.isArray(data.logs)) {
+          setAttendanceDbLogs(data.logs);
+        }
+      }
+    } catch (err) {
+      console.warn('Error fetching attendance logs:', err);
+    }
+  };
 
   const refreshAuditLogs = async () => {
     try {
@@ -366,6 +445,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     if (emp) {
       setCurrentUserId(emp.id);
       setSessionToken(`sess-${Date.now()}`);
+      localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
       addToast('info', 'Active Persona Switched', `Logged in as ${emp.firstName} ${emp.lastName} (${emp.role.toUpperCase()})`);
       
       // Also log switch event to DB
@@ -432,6 +512,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         });
         setCurrentUserId(data.user.id);
         setSessionToken(data.token || `sess-${Date.now()}`);
+        localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
         setIsAuthModalOpen(false);
         addToast('success', 'Verified & Signed In', `Authenticated with Supabase DB as ${data.user.firstName} ${data.user.lastName}`);
         return true;
@@ -534,6 +615,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         }
 
         setSessionToken(data.token || `sess-${Date.now()}`);
+        localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
         setIsAuthModalOpen(false);
         triggerCelebration({
           type: 'general',
@@ -562,7 +644,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   };
 
   // Sign Out function
-  const signOut = async () => {
+  const signOut = async (reason?: string) => {
     const userToLog = currentUser;
     const tokenToClear = sessionToken;
 
@@ -576,6 +658,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
           userId: userToLog?.id,
           email: userToLog?.email,
           role: userToLog?.role,
+          reason: reason || 'USER_LOGOUT',
         }),
       });
       await refreshAuditLogs();
@@ -583,17 +666,92 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       console.warn('Logout API error:', err);
     }
 
-    // Clear active session and user
+    // Clear active session, user, and last activity timestamp
     setCurrentUserId(null);
     setSessionToken(null);
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
     localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.LAST_ACTIVITY);
 
     // Prompt user to sign in again
     setAuthModalMode('signin');
     setIsAuthModalOpen(true);
-    addToast('info', 'Successfully Signed Out', 'Session terminated. Database audit log recorded.');
+    
+    if (reason === 'INACTIVITY_TIMEOUT') {
+      addToast('warning', 'Session Expired', 'You have been automatically signed out after 30 minutes of inactivity for security.');
+    } else {
+      addToast('info', 'Successfully Signed Out', 'Session terminated. Database audit log recorded.');
+    }
   };
+
+  // Security: Automatic Sign Out after 30 minutes of inactivity
+  useEffect(() => {
+    if (!isAuthenticated || !currentUserId) return;
+
+    const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+    const CHECK_INTERVAL_MS = 10 * 1000; // Check every 10 seconds
+
+    // Ensure last activity is initialized
+    const saved = localStorage.getItem(STORAGE_KEYS.LAST_ACTIVITY);
+    if (!saved) {
+      localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
+    }
+
+    let lastUpdate = Date.now();
+    const handleUserActivity = () => {
+      const now = Date.now();
+      // Throttle updating storage to at most once every 2 seconds
+      if (now - lastUpdate > 2000) {
+        lastUpdate = now;
+        localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, now.toString());
+      }
+    };
+
+    // User interaction events that reset the activity timer
+    const activityEvents: (keyof WindowEventMap)[] = [
+      'mousedown',
+      'mousemove',
+      'keydown',
+      'scroll',
+      'touchstart',
+      'click'
+    ];
+
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, handleUserActivity, { passive: true });
+    });
+
+    // Periodic check for inactivity expiration
+    const intervalId = setInterval(() => {
+      const storedLastActivity = localStorage.getItem(STORAGE_KEYS.LAST_ACTIVITY);
+      const lastActivityTime = storedLastActivity ? parseInt(storedLastActivity, 10) : lastUpdate;
+      const elapsed = Date.now() - lastActivityTime;
+
+      if (elapsed >= INACTIVITY_TIMEOUT_MS) {
+        signOut('INACTIVITY_TIMEOUT');
+      }
+    }, CHECK_INTERVAL_MS);
+
+    // Also check on tab visibility regain (e.g. user returns after being away)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const storedLastActivity = localStorage.getItem(STORAGE_KEYS.LAST_ACTIVITY);
+        const lastActivityTime = storedLastActivity ? parseInt(storedLastActivity, 10) : lastUpdate;
+        if (Date.now() - lastActivityTime >= INACTIVITY_TIMEOUT_MS) {
+          signOut('INACTIVITY_TIMEOUT');
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, handleUserActivity);
+      });
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(intervalId);
+    };
+  }, [isAuthenticated, currentUserId]);
 
   // Attendance Actions
   const checkIn = () => {
@@ -638,6 +796,21 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       }
     });
 
+    // Write real-time attendance telemetry to Supabase DB
+    fetch('/api/attendance/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        employeeId: currentUser.employeeId,
+        employeeName: `${currentUser.firstName} ${currentUser.lastName}`,
+        email: currentUser.email,
+        date: todayStr,
+        actionType: 'CHECK_IN',
+        checkInTime: timeStr,
+        status: 'present',
+      }),
+    }).then(() => refreshAttendanceLogs()).catch(() => {});
+
     addToast('success', 'Checked In Successfully', `Good day, ${currentUser.firstName}! Punch recorded at ${timeStr}`);
   };
 
@@ -670,24 +843,41 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       return prev;
     });
 
+    // Write punch out telemetry to Supabase DB
+    fetch('/api/attendance/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        employeeId: currentUser.employeeId,
+        employeeName: `${currentUser.firstName} ${currentUser.lastName}`,
+        email: currentUser.email,
+        date: todayStr,
+        actionType: 'CHECK_OUT',
+        checkInTime: checkInState.checkInTimestamp,
+        checkOutTime: timeStr,
+        totalHoursWorked: Math.max(hoursWorked, 0.1),
+        breakMinutes: breakMins,
+        status: 'present',
+      }),
+    }).then(() => refreshAttendanceLogs()).catch(() => {});
+
     addToast('info', 'Checked Out Successfully', `Punch out recorded at ${timeStr}. Total time: ${hoursWorked} hrs`);
   };
 
   const toggleBreak = () => {
     const now = new Date();
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    const todayStr = now.toISOString().split('T')[0];
+    const nextBreak = !checkInState.isOnBreak;
     
     setCheckInState((prev) => {
-      const nextBreak = !prev.isOnBreak;
       if (nextBreak) {
-        addToast('info', 'Break Started', `Enjoy your break! Started at ${timeStr}`);
         return {
           ...prev,
           isOnBreak: true,
           breakStartTimestamp: timeStr,
         };
       } else {
-        addToast('success', 'Back from Break', `Welcome back! Resumed work at ${timeStr}`);
         return {
           ...prev,
           isOnBreak: false,
@@ -695,6 +885,30 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         };
       }
     });
+
+    if (nextBreak) {
+      addToast('info', 'Break Started', `Enjoy your break! Started at ${timeStr}`);
+    } else {
+      addToast('success', 'Back from Break', `Welcome back! Resumed work at ${timeStr}`);
+    }
+
+    // Write break telemetry to Supabase DB
+    if (currentUser) {
+      fetch('/api/attendance/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: currentUser.employeeId,
+          employeeName: `${currentUser.firstName} ${currentUser.lastName}`,
+          email: currentUser.email,
+          date: todayStr,
+          actionType: nextBreak ? 'BREAK_START' : 'BREAK_END',
+          checkInTime: checkInState.checkInTimestamp,
+          breakMinutes: Math.round(checkInState.accumulatedBreakSeconds / 60),
+          status: nextBreak ? 'on_break' : 'present',
+        }),
+      }).then(() => refreshAttendanceLogs()).catch(() => {});
+    }
   };
 
   const markAttendanceManual = (record: AttendanceRecord) => {
@@ -708,6 +922,37 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       }
       return [{ ...record, isManual: true, regularizedBy: regularizer }, ...prev];
     });
+
+    // Send manual regularization to Supabase DB
+    fetch('/api/attendance/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        employeeId: record.employeeId,
+        date: record.date,
+        actionType: 'MANUAL_PUNCH',
+        checkInTime: record.checkInTime,
+        checkOutTime: record.checkOutTime,
+        totalHoursWorked: record.totalHoursWorked,
+        breakMinutes: record.breakMinutes,
+        status: record.status,
+      }),
+    }).then(() => refreshAttendanceLogs()).catch(() => {});
+
+    // Notify employee of attendance regularization
+    const attNotif: NotificationItem = {
+      id: `notif-att-${Date.now()}`,
+      title: 'Attendance Regularization',
+      message: `Your punch record for ${record.date} was regularized by ${regularizer}.`,
+      timestamp: 'Just now',
+      isRead: false,
+      type: 'attendance',
+      targetRole: 'employee',
+      targetEmployeeId: record.employeeId,
+      linkTab: 'attendance',
+    };
+    setNotifications((prev) => [attNotif, ...prev]);
+
     addToast('success', 'Attendance Record Updated', `Successfully regularized attendance for ${record.employeeId} on ${record.date}`);
   };
 
@@ -899,7 +1144,15 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     if (selectedEmployeeForModal?.id === updated.id) {
       setSelectedEmployeeForModal(updated);
     }
-    addToast('success', 'Profile Updated', `Changes to ${updated.firstName} ${updated.lastName}'s profile have been saved.`);
+
+    // Persist to Supabase database
+    fetch(`/api/employees/${updated.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    }).catch((err) => console.warn('Supabase profile update sync error:', err));
+
+    addToast('success', 'Profile Updated & Synced', `Changes to ${updated.firstName} ${updated.lastName}'s profile saved in Supabase.`);
   };
 
   const addNewEmployee = async (newEmployeeData: Omit<Employee, 'id'>, initialPassword?: string) => {
@@ -910,12 +1163,13 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     };
     setEmployees((prev) => [completeEmp, ...prev]);
 
-    // Also persist user credentials to backend / Supabase
+    // Also persist user credentials and full details to backend / Supabase
     try {
       await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: completeEmp.id,
           employeeId: completeEmp.employeeId,
           email: completeEmp.email,
           firstName: completeEmp.firstName,
@@ -923,6 +1177,15 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
           role: completeEmp.role,
           department: completeEmp.jobDetails.department,
           password: initialPassword || 'EmployeePass2026!',
+          phone: completeEmp.phone,
+          avatar: completeEmp.avatar,
+          status: completeEmp.status,
+          jobDetails: completeEmp.jobDetails,
+          personalDetails: completeEmp.personalDetails,
+          salaryStructure: completeEmp.salaryStructure,
+          leaveBalance: completeEmp.leaveBalance,
+          bankDetails: completeEmp.bankDetails,
+          documents: completeEmp.documents,
         }),
       });
     } catch (err) {
@@ -948,15 +1211,136 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   };
 
   const updateSalaryStructure = (employeeId: string, structure: SalaryStructure) => {
+    let targetEmp: Employee | undefined;
     setEmployees((prev) =>
       prev.map((emp) => {
         if (emp.employeeId === employeeId || emp.id === employeeId) {
-          return { ...emp, salaryStructure: structure };
+          targetEmp = { ...emp, salaryStructure: structure };
+          return targetEmp;
         }
         return emp;
       })
     );
-    addToast('success', 'Salary Structure Updated', `Compensation package updated for ${employeeId}.`);
+
+    if (targetEmp) {
+      fetch(`/api/employees/${(targetEmp as Employee).id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ salaryStructure: structure }),
+      }).catch((err) => console.warn('Supabase salary update sync error:', err));
+    }
+
+    addToast('success', 'Salary Structure Updated', `Compensation package updated and synced for ${employeeId}.`);
+  };
+
+  const terminateEmployee = async (employeeId: string, reason?: string, notes?: string): Promise<boolean> => {
+    const target = employees.find((e) => e.id === employeeId || e.employeeId === employeeId);
+    if (!target) {
+      addToast('error', 'Employee Not Found', `Could not find employee with ID: ${employeeId}`);
+      return false;
+    }
+
+    const terminationReason = reason || 'Employment terminated by HR Administration';
+
+    // Update in React State
+    setEmployees((prev) =>
+      prev.map((emp) => {
+        if (emp.id === target.id || emp.employeeId === target.employeeId) {
+          return { ...emp, status: 'Terminated' };
+        }
+        return emp;
+      })
+    );
+
+    if (selectedEmployeeForModal?.id === target.id || selectedEmployeeForModal?.employeeId === target.employeeId) {
+      setSelectedEmployeeForModal((prev) => (prev ? { ...prev, status: 'Terminated' } : null));
+    }
+
+    // Call Supabase Database API
+    try {
+      await fetch(`/api/employees/${target.id}/terminate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reason: terminationReason,
+          notes,
+          severedBy: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'HR Administrator',
+          terminationDate: new Date().toISOString().split('T')[0],
+        }),
+      });
+    } catch (err) {
+      console.warn('Termination API sync notice:', err);
+    }
+
+    // Refresh audit telemetry in drawer
+    refreshAuditLogs().catch(() => {});
+
+    // Notification
+    const notif: NotificationItem = {
+      id: `notif-term-${Date.now()}`,
+      title: 'Employee Terminated',
+      message: `${target.firstName} ${target.lastName} (${target.employeeId}) has been marked as Terminated in the database. Reason: ${terminationReason}`,
+      timestamp: 'Just now',
+      isRead: false,
+      type: 'system',
+      targetRole: 'admin',
+      linkTab: 'employees',
+    };
+    setNotifications((prev) => [notif, ...prev]);
+
+    addToast('error', 'Employee Terminated', `${target.firstName} ${target.lastName} (${target.employeeId}) is now Terminated. Database updated.`);
+    return true;
+  };
+
+  const rehireEmployee = async (employeeId: string): Promise<boolean> => {
+    const target = employees.find((e) => e.id === employeeId || e.employeeId === employeeId);
+    if (!target) return false;
+
+    setEmployees((prev) =>
+      prev.map((emp) => {
+        if (emp.id === target.id || emp.employeeId === target.employeeId) {
+          return { ...emp, status: 'Active' };
+        }
+        return emp;
+      })
+    );
+
+    if (selectedEmployeeForModal?.id === target.id || selectedEmployeeForModal?.employeeId === target.employeeId) {
+      setSelectedEmployeeForModal((prev) => (prev ? { ...prev, status: 'Active' } : null));
+    }
+
+    try {
+      await fetch(`/api/employees/${target.id}/rehire`, {
+        method: 'POST',
+      });
+    } catch (err) {
+      console.warn('Rehire API sync error:', err);
+    }
+
+    refreshAuditLogs().catch(() => {});
+    addToast('success', 'Employee Reactivated', `${target.firstName} ${target.lastName} status restored to Active in Supabase.`);
+    return true;
+  };
+
+  const deleteEmployee = async (employeeId: string): Promise<boolean> => {
+    const target = employees.find((e) => e.id === employeeId || e.employeeId === employeeId);
+    if (!target) return false;
+
+    setEmployees((prev) => prev.filter((e) => e.id !== target.id && e.employeeId !== target.employeeId));
+    if (selectedEmployeeForModal?.id === target.id || selectedEmployeeForModal?.employeeId === target.employeeId) {
+      closeEmployeeProfile();
+    }
+
+    try {
+      await fetch(`/api/employees/${target.id}`, {
+        method: 'DELETE',
+      });
+    } catch (err) {
+      console.warn('Delete API sync error:', err);
+    }
+
+    addToast('info', 'Record Removed', `${target.firstName} ${target.lastName} deleted from database.`);
+    return true;
   };
 
   const generateMonthlyPayroll = (month: string, year: number) => {
@@ -1003,16 +1387,30 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     });
 
     const notif: NotificationItem = {
-      id: `notif-${Date.now()}`,
+      id: `notif-admin-pay-${Date.now()}`,
       title: `${month} ${year} Payroll Executed`,
       message: `Salary distribution slips generated and credited for ${employees.length} employees.`,
       timestamp: 'Just now',
       isRead: false,
       type: 'payroll',
-      targetRole: 'all',
+      targetRole: 'admin',
       linkTab: 'payroll',
     };
-    setNotifications((prev) => [notif, ...prev]);
+
+    // Send individual notifications to each employee for their specific salary payslip
+    const employeePayslipNotifs: NotificationItem[] = newSlips.map((slip) => ({
+      id: `notif-slip-${slip.employeeId}-${Date.now()}`,
+      title: `${month} ${year} Payslip Disbursed`,
+      message: `Your ${month} ${year} salary statement is ready. Net Pay: $${slip.netPay.toLocaleString()} credited.`,
+      timestamp: 'Just now',
+      isRead: false,
+      type: 'payroll',
+      targetRole: 'employee',
+      targetEmployeeId: slip.employeeId,
+      linkTab: 'payroll',
+    }));
+
+    setNotifications((prev) => [notif, ...employeePayslipNotifs, ...prev]);
 
     triggerCelebration({
       type: 'payroll_disbursed',
@@ -1040,7 +1438,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
   const resetDemoData = () => {
     setEmployees(INITIAL_EMPLOYEES);
-    setCurrentUserId('emp-1');
+    setCurrentUserId('emp-sarvesh');
     setAttendanceRecords(generateInitialAttendance());
     setLeaveRequests(INITIAL_LEAVE_REQUESTS);
     setPayslips(INITIAL_PAYSLIPS);
@@ -1054,15 +1452,14 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       accumulatedBreakSeconds: 0,
     });
     localStorage.clear();
-    addToast('info', 'Demo Reset', 'Application state has been restored to default hackathon scenario.');
+    addToast('info', 'Demo Reset', 'Application state has been restored to default Sarvesh V scenario.');
   };
 
   const unreadNotificationCount = notifications.filter((n) => {
     if (n.isRead) return false;
-    if (n.targetRole === 'all') return true;
-    if (n.targetRole === currentRole) return true;
-    if (n.targetEmployeeId && currentUser && n.targetEmployeeId === currentUser.employeeId) return true;
-    return false;
+    if (!currentUser) return false;
+    if (currentRole === 'admin') return true;
+    return n.targetEmployeeId === currentUser.employeeId;
   }).length;
 
   return (
@@ -1071,8 +1468,12 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         currentUser,
         currentRole,
         isAuthenticated,
+        theme,
+        toggleTheme,
+        setTheme,
         employees,
         attendanceRecords,
+        attendanceDbLogs,
         leaveRequests,
         payslips,
         notifications,
@@ -1105,6 +1506,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         openAuditDrawer,
         closeAuditDrawer,
         refreshAuditLogs,
+        refreshAttendanceLogs,
         checkIn,
         checkOut,
         toggleBreak,
@@ -1116,6 +1518,9 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         updateEmployee,
         addNewEmployee,
         updateSalaryStructure,
+        terminateEmployee,
+        rehireEmployee,
+        deleteEmployee,
         generateMonthlyPayroll,
         markNotificationRead,
         markAllNotificationsRead,

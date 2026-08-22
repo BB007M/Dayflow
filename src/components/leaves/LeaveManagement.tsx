@@ -54,6 +54,36 @@ export const LeaveManagement: React.FC = () => {
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Handle start date changes: automatically update end date if it is behind start date or if single-day leave or half-day
+  const handleStartDateChange = (newStart: string) => {
+    setStartDate(newStart);
+    if (isHalfDay) {
+      setEndDate(newStart);
+    } else if (!endDate || endDate < newStart || endDate === startDate) {
+      setEndDate(newStart);
+    }
+  };
+
+  // Handle end date changes: if half day was ticked and end date is changed, remove the half day tick
+  const handleEndDateChange = (newEnd: string) => {
+    if (isHalfDay) {
+      setIsHalfDay(false);
+    }
+    if (startDate && newEnd < startDate) {
+      setEndDate(startDate);
+    } else {
+      setEndDate(newEnd);
+    }
+  };
+
+  // Handle half-day checkbox toggle: synchronize end date with start date when checked
+  const handleHalfDayToggle = (checked: boolean) => {
+    setIsHalfDay(checked);
+    if (checked) {
+      setEndDate(startDate);
+    }
+  };
+
   // Filter state for requests table
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [typeFilter, setTypeFilter] = useState<string>('All');
@@ -99,6 +129,9 @@ export const LeaveManagement: React.FC = () => {
     });
 
     // Reset form
+    const todayStr = new Date().toISOString().split('T')[0];
+    setStartDate(todayStr);
+    setEndDate(todayStr);
     setReason('');
     setIsHalfDay(false);
     setIsSubmitting(false);
@@ -262,6 +295,19 @@ export const LeaveManagement: React.FC = () => {
               </select>
             </div>
 
+            {/* Half-Day Leave Request (Moved above Start Date & End Date) */}
+            <div className="flex items-center p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+              <label className="text-xs font-semibold text-slate-700 cursor-pointer flex items-center gap-2 select-none w-full">
+                <input
+                  type="checkbox"
+                  checked={isHalfDay}
+                  onChange={(e) => handleHalfDayToggle(e.target.checked)}
+                  className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                />
+                <span>Half-Day Request (0.5 Day)</span>
+              </label>
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -270,7 +316,7 @@ export const LeaveManagement: React.FC = () => {
                 <input
                   type="date"
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-purple-600 outline-none"
                   required
                 />
@@ -283,25 +329,22 @@ export const LeaveManagement: React.FC = () => {
                 <input
                   type="date"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  min={startDate}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-purple-600 outline-none"
                   required
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-              <label className="text-xs font-semibold text-slate-700 cursor-pointer flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={isHalfDay}
-                  onChange={(e) => setIsHalfDay(e.target.checked)}
-                  className="w-4 h-4 text-purple-600 rounded"
-                />
-                <span>Half-Day Request (0.5 Day)</span>
-              </label>
-              <span className="text-xs font-bold text-purple-700">
-                Total: {totalDays} {totalDays === 1 ? 'day' : 'days'}
+            {/* Separate Total Duration Display Bar */}
+            <div className="flex items-center justify-between p-2.5 bg-purple-50/80 rounded-xl border border-purple-100">
+              <span className="text-xs font-semibold text-purple-900 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-purple-600" />
+                Total Duration
+              </span>
+              <span className="text-xs font-bold text-purple-700 bg-white px-2.5 py-0.5 rounded-lg border border-purple-200/80 shadow-2xs">
+                {totalDays} {totalDays === 1 ? 'day' : 'days'}
               </span>
             </div>
 

@@ -108,6 +108,23 @@ export interface AttendanceRecord {
   regularizedBy?: string;
 }
 
+export interface AttendanceDbLog {
+  id: string;
+  employeeId: string;
+  employeeName?: string;
+  email?: string;
+  date: string;
+  actionType: 'CHECK_IN' | 'CHECK_OUT' | 'BREAK_START' | 'BREAK_END' | 'MANUAL_PUNCH';
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
+  totalHoursWorked?: number;
+  breakMinutes?: number;
+  status: string;
+  ipAddress?: string;
+  userAgent?: string;
+  timestamp: string;
+}
+
 export interface LeaveRequest {
   id: string;
   employeeId: string;
