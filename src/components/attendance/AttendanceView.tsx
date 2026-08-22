@@ -148,7 +148,6 @@ export const AttendanceView: React.FC = () => {
     await refreshAttendanceLogs();
     setTimeout(() => setIsRefreshingLogs(false), 400);
   };
-
   // Form state for regularizing/editing attendance
   const [editStatus, setEditStatus] = useState<AttendanceStatus>('present');
   const [editCheckIn, setEditCheckIn] = useState('09:00 AM');
@@ -218,7 +217,7 @@ export const AttendanceView: React.FC = () => {
     ));
   };
 
-  const getMonthlyLabel = () => new Date(`${selectedDate.slice(0, 7)}-01T00:00:00`).toLocaleDateString('en-US', {
+  const getMonthlyLabel = () => new Date(`${selectedDate.slice(0, 7)}-01T00:00:00`).toLocaleDateString('en-IN', {
     month: 'long',
     year: 'numeric',
   });
@@ -464,11 +463,11 @@ export const AttendanceView: React.FC = () => {
         </div>
       </div>
 
-      {/* Control Bar: View Switcher (Daily / Monthly / DB Logs) & Filters */}
+      {/* Control Bar: Attendance Views & Filters */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           
-          {/* View Mode Buttons (PDF 3.4.1 + Supabase DB Logs) */}
+          {/* View Mode Buttons */}
           <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200 dark:border-slate-700 w-full sm:w-auto overflow-x-auto">
             <button
               onClick={() => setViewMode('monthly')}
@@ -489,17 +488,6 @@ export const AttendanceView: React.FC = () => {
               }`}
             >
               Daily Timeline
-            </button>
-            <button
-              onClick={() => setViewMode('db_logs')}
-              className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'db_logs'
-                  ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Database className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Attendance DB Logs</span>
             </button>
           </div>
 
@@ -758,8 +746,8 @@ export const AttendanceView: React.FC = () => {
         </div>
       )}
 
-      {/* VIEW 3: Real-Time Supabase Attendance DB Logs */}
-      {viewMode === 'db_logs' && (
+      {/* Internal attendance telemetry is kept out of the presentation UI. */}
+      {false && viewMode === 'db_logs' && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
           <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-900/50">
             <div>

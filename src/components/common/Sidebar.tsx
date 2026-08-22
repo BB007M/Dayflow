@@ -42,7 +42,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     currentRole, 
     currentUser, 
     leaveRequests,
-    switchRole,
     openEmployeeProfile,
     openAuthModal,
     signOut
@@ -118,14 +117,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-40 w-64 bg-slate-950/95 backdrop-blur-xl text-slate-100 flex flex-col border-r border-white/10 shadow-[18px_0_55px_rgba(15,23,42,0.08)] transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+        className={`fixed top-0 bottom-0 left-0 z-40 w-64 bg-slate-900 text-slate-100 flex flex-col border-r border-slate-800 transition-transform duration-300 ease-in-out lg:translate-x-0 ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:static lg:z-10`}
       >
         {/* Brand Header */}
-        <div className="p-5 border-b border-white/10 flex items-center justify-between">
+        <div className="p-5 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-500 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-purple-600/30">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-500 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-purple-600/30">
               <Building2 className="w-5 h-5" />
             </div>
             <div>
@@ -156,7 +155,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all group ${
                   isActive
                     ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-900/30 font-semibold'
-                    : 'text-slate-300 hover:text-white hover:bg-white/8'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -172,20 +171,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
 
-          {/* Quick Database Security Status */}
-          <div className="pt-3">
-            <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-              System Infrastructure
-            </div>
-            <div className="mx-2 p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50 text-[11px] text-slate-300 flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Supabase Database Active</span>
-            </div>
-          </div>
         </div>
 
         {/* Current User & Logout Footer */}
-        <div className="p-3 border-t border-white/10 bg-black/10 space-y-2">
+        <div className="p-3 border-t border-slate-800 bg-slate-950/60 space-y-2">
           {/* Active User Card */}
           {currentUser ? (
             <>
@@ -194,7 +183,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className="flex items-center gap-3 p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 cursor-pointer border border-slate-800 transition-colors"
                 title="View Profile Details"
               >
-                <ProfilePlaceholder imageUrl={currentUser.avatar} label={`${currentUser.firstName} ${currentUser.lastName}`} className="w-9 h-9" />
+                <ProfilePlaceholder label={`${currentUser.firstName} ${currentUser.lastName}`} className="w-9 h-9" />
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-white truncate">
                     {currentUser.firstName} {currentUser.lastName}

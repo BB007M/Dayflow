@@ -1,7 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { useHR } from '../../context/HRContext';
 import { ProfilePlaceholder } from '../common/ProfilePlaceholder';
 import { Employee, Department, EmploymentType, WorkLocation } from '../../types';
+import { formatINR } from '../../currency';
 import { 
   X, 
   User, 
@@ -48,8 +49,6 @@ export const EmployeeProfileModal: React.FC = () => {
   const [fireReason, setFireReason] = useState('Performance Discrepancy');
   const [fireNotes, setFireNotes] = useState('');
   const [isProcessingTermination, setIsProcessingTermination] = useState(false);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Sync state if selectedEmployeeForModal changes
   React.useEffect(() => {
@@ -76,52 +75,6 @@ export const EmployeeProfileModal: React.FC = () => {
   const handleCancel = () => {
     setFormData(selectedEmployeeForModal);
     setIsEditing(false);
-  };
-
-  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !formData) return;
-
-    if (!file.type.startsWith('image/')) {
-      addToast('error', 'Choose an image', 'Please select a JPG, PNG, WebP, or other image file.');
-      return;
-    }
-    if (file.size > 4 * 1024 * 1024) {
-      addToast('error', 'Image is too large', 'Choose an image smaller than 4 MB.');
-      return;
-    }
-
-    setIsUploadingAvatar(true);
-    try {
-      const fileData = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error('Unable to read the selected image.'));
-        reader.readAsDataURL(file);
-      });
-      const response = await fetch('/api/storage/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: `avatar-${formData.id}-${Date.now()}-${file.name}`,
-          fileData,
-          bucket: 'avatars',
-          contentType: file.type,
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok || !result.success || !result.url) {
-        throw new Error(result.error || 'Image upload failed.');
-      }
-
-      setFormData((current) => current ? { ...current, avatar: result.url } : current);
-      addToast('success', 'Photo ready', 'Your new profile photo will be saved with the profile changes.');
-    } catch (error) {
-      addToast('error', 'Photo upload failed', error instanceof Error ? error.message : 'Please try again.');
-    } finally {
-      setIsUploadingAvatar(false);
-      event.target.value = '';
-    }
   };
 
   const handleExecuteFire = async () => {
@@ -271,28 +224,7 @@ export const EmployeeProfileModal: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 pr-0 sm:pr-36">
             <div className="relative group shrink-0">
-                <ProfilePlaceholder imageUrl={formData.avatar} label={`${formData.firstName} ${formData.lastName}`} className={`w-20 h-20 text-lg rounded-2xl ring-4 shadow-lg ${isTerminated ? 'ring-rose-400/40' : 'ring-white/20'}`} />
-                {isEditing && canEdit && (
-                  <>
-                    <input
-                      ref={avatarInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      onChange={handleAvatarChange}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => avatarInputRef.current?.click()}
-                      disabled={isUploadingAvatar}
-                      className="absolute -bottom-2 -right-2 h-8 w-8 rounded-xl border border-white/25 bg-white text-purple-700 shadow-lg transition hover:scale-105 disabled:cursor-wait disabled:opacity-70 flex items-center justify-center"
-                      aria-label="Upload profile photo"
-                      title="Upload profile photo"
-                    >
-                      <Upload className={`h-3.5 w-3.5 ${isUploadingAvatar ? 'animate-pulse' : ''}`} />
-                    </button>
-                  </>
-                )}
+                <ProfilePlaceholder label={`${formData.firstName} ${formData.lastName}`} className={`w-20 h-20 text-lg rounded-2xl ring-4 shadow-lg ${isTerminated ? 'ring-rose-400/40' : 'ring-white/20'}`} />
             </div>
 
             <div className="text-center sm:text-left flex-1 min-w-0">
@@ -906,14 +838,13 @@ export const EmployeeProfileModal: React.FC = () => {
                     Total Monthly Gross CTC
                   </span>
                   <div className="text-2xl font-bold text-purple-950 font-display">
-                    $
-                    {(
+                    {formatINR((
                       (formData.salaryStructure?.basicSalary || 0) +
                       (formData.salaryStructure?.hra || 0) +
                       (formData.salaryStructure?.conveyanceAllowance || 0) +
                       (formData.salaryStructure?.medicalAllowance || 0) +
                       (formData.salaryStructure?.specialAllowance || 0)
-                    ).toLocaleString()}
+                    ))}
                   </div>
                 </div>
 
@@ -922,8 +853,7 @@ export const EmployeeProfileModal: React.FC = () => {
                     Estimated Net Take-Home
                   </span>
                   <div className="text-2xl font-bold text-emerald-700 font-display">
-                    $
-                    {(
+                    {formatINR((
                       (formData.salaryStructure?.basicSalary || 0) +
                       (formData.salaryStructure?.hra || 0) +
                       (formData.salaryStructure?.conveyanceAllowance || 0) +
@@ -932,7 +862,7 @@ export const EmployeeProfileModal: React.FC = () => {
                       (formData.salaryStructure?.providentFund || 0) -
                       (formData.salaryStructure?.incomeTax || 0) -
                       (formData.salaryStructure?.professionalTax || 0)
-                    ).toLocaleString()}
+                    ))}
                   </div>
                 </div>
               </div>
@@ -945,7 +875,7 @@ export const EmployeeProfileModal: React.FC = () => {
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Basic Salary ($)</label>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Basic Salary (₹)</label>
                     <input
                       type="number"
                       disabled={!isEditing || !isAdmin}
@@ -965,7 +895,7 @@ export const EmployeeProfileModal: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">HRA ($)</label>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">HRA (₹)</label>
                     <input
                       type="number"
                       disabled={!isEditing || !isAdmin}
@@ -985,7 +915,7 @@ export const EmployeeProfileModal: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Conveyance Allowance ($)</label>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Conveyance Allowance (₹)</label>
                     <input
                       type="number"
                       disabled={!isEditing || !isAdmin}
@@ -1005,7 +935,7 @@ export const EmployeeProfileModal: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Medical Allowance ($)</label>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Medical Allowance (₹)</label>
                     <input
                       type="number"
                       disabled={!isEditing || !isAdmin}
@@ -1025,7 +955,7 @@ export const EmployeeProfileModal: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Special Allowance ($)</label>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Special Allowance (₹)</label>
                     <input
                       type="number"
                       disabled={!isEditing || !isAdmin}
@@ -1055,7 +985,7 @@ export const EmployeeProfileModal: React.FC = () => {
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Provident Fund (PF) ($)</label>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Provident Fund (PF) (₹)</label>
                     <input
                       type="number"
                       disabled={!isEditing || !isAdmin}
@@ -1075,7 +1005,7 @@ export const EmployeeProfileModal: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Income Tax (TDS) ($)</label>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Income Tax (TDS) (₹)</label>
                     <input
                       type="number"
                       disabled={!isEditing || !isAdmin}
@@ -1095,7 +1025,7 @@ export const EmployeeProfileModal: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Professional Tax ($)</label>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Professional Tax (₹)</label>
                     <input
                       type="number"
                       disabled={!isEditing || !isAdmin}
@@ -1121,7 +1051,7 @@ export const EmployeeProfileModal: React.FC = () => {
               <div className="pt-3 border-t border-slate-200">
                 <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
                   <Banknote className="w-4 h-4 text-purple-600" />
-                  <span>Disbursement Account & Tax IDs</span>
+                  <span>Disbursement Account, IFSC & PAN</span>
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>

@@ -9,7 +9,6 @@ import {
   Eye, 
   EyeOff, 
   ArrowRight, 
-  Database,
   Layers,
   Info,
   Sun,
@@ -20,8 +19,6 @@ import {
 export const LoginPage: React.FC = () => {
   const { 
     signIn, 
-    isDbConnected,
-    openAuditDrawer,
     theme,
     toggleTheme
   } = useHR();
@@ -95,18 +92,6 @@ export const LoginPage: React.FC = () => {
               )}
             </button>
 
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 text-xs font-medium text-slate-700 dark:text-slate-300">
-              <Database className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 animate-pulse" />
-              <span>{isDbConnected ? 'Supabase Connected' : 'Supabase Active'}</span>
-            </div>
-            
-            <button
-              onClick={openAuditDrawer}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-100 dark:bg-purple-900/40 hover:bg-purple-200 dark:hover:bg-purple-900/60 border border-purple-200 dark:border-purple-700/50 text-xs font-medium text-purple-800 dark:text-purple-200 transition-colors"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-              <span>DB Audit Logs</span>
-            </button>
           </div>
         </div>
       </header>
@@ -252,7 +237,7 @@ export const LoginPage: React.FC = () => {
 
       {/* Footer */}
       <footer className="relative z-10 py-4 text-center text-xs text-slate-500 border-t border-slate-200 dark:border-slate-800/60 bg-white/60 dark:bg-slate-950">
-        <p>Dayflow HRMS • Enterprise Cloud &amp; Supabase Database</p>
+        <p>Dayflow HRMS • Workforce Management</p>
       </footer>
     </div>
   );

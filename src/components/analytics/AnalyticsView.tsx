@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useHR } from '../../context/HRContext';
+import { formatINR, formatINRCompact } from '../../currency';
 import { 
   BarChart, 
   Bar, 
@@ -142,7 +143,7 @@ export const AnalyticsView: React.FC = () => {
         <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
           <span className="text-xs text-slate-500 font-semibold uppercase">Monthly Payroll Budget</span>
           <div className="text-2xl font-bold text-slate-900 font-display mt-1">
-            ${Object.values(deptSalaryMap).reduce((a, b) => a + b, 0).toLocaleString()}
+            {formatINR(Object.values(deptSalaryMap).reduce((a, b) => a + b, 0))}
           </div>
           <span className="text-[11px] text-slate-500">6 Departments Total</span>
         </div>
@@ -251,7 +252,7 @@ export const AnalyticsView: React.FC = () => {
               <h3 className="font-bold text-slate-900 text-sm font-display">
                 Monthly Payroll Spend by Department
               </h3>
-              <p className="text-xs text-slate-500">Gross compensation expenditure (USD)</p>
+              <p className="text-xs text-slate-500">Gross compensation expenditure (INR)</p>
             </div>
             <span className="text-xs font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full">
               Live Budget
@@ -275,11 +276,11 @@ export const AnalyticsView: React.FC = () => {
                   tick={{ fontSize: 11, fill: '#64748b' }} 
                   axisLine={false} 
                   tickLine={false}
-                  tickFormatter={(val) => `$${val / 1000}k`}
+                  tickFormatter={(val) => formatINRCompact(Number(val))}
                 />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#1e1b4b', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '12px' }}
-                  formatter={(val: any) => [`$${Number(val).toLocaleString()}`, 'Monthly Spend']}
+                  formatter={(val: any) => [formatINR(Number(val)), 'Monthly Spend']}
                 />
                 <Bar dataKey="budget" fill="#0d9488" radius={[6, 6, 0, 0]} />
               </BarChart>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useHR } from '../../context/HRContext';
 import { Payslip, Employee } from '../../types';
+import { formatINR } from '../../currency';
 import { 
   Banknote, 
   Download, 
@@ -26,6 +27,7 @@ export const PayrollView: React.FC = () => {
     payslips, 
     employees, 
     generateMonthlyPayroll,
+    updateSalaryStructure,
     openAuthModal,
     addToast
   } = useHR();
@@ -35,6 +37,11 @@ export const PayrollView: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState('All');
   const [searchEmployee, setSearchEmployee] = useState('');
   const [selectedPayslipForModal, setSelectedPayslipForModal] = useState<Payslip | null>(null);
+  const [isIncrementOpen, setIsIncrementOpen] = useState(false);
+  const [incrementEmployeeId, setIncrementEmployeeId] = useState('');
+  const [incrementPercentage, setIncrementPercentage] = useState(10);
+  const [incrementEffectiveDate, setIncrementEffectiveDate] = useState(new Date().toISOString().split('T')[0]);
+  const [incrementReason, setIncrementReason] = useState('Performance review salary hike');
 
   if (!currentUser) {
     return (
@@ -87,6 +94,44 @@ export const PayrollView: React.FC = () => {
 
   const currentEmpNet = currentEmpGross - currentEmpDeductions;
 
+  const incrementEmployee = employees.find((employee) => employee.employeeId === incrementEmployeeId);
+  const currentBasicSalary = incrementEmployee?.salaryStructure?.basicSalary || 0;
+  const incrementAmount = Math.round(currentBasicSalary * (incrementPercentage / 100));
+  const newBasicSalary = currentBasicSalary + incrementAmount;
+
+  const handleSalaryIncrement = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!isAdmin || !incrementEmployee || incrementPercentage <= 0 || !incrementReason.trim()) return;
+    const createdAt = new Date().toISOString();
+    updateSalaryStructure(incrementEmployee.employeeId, {
+      ...incrementEmployee.salaryStructure,
+      basicSalary: newBasicSalary,
+    });
+    const response = await fetch('/api/salary-increments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: `increment-${Date.now()}`,
+        employeeId: incrementEmployee.employeeId,
+        employeeName: `${incrementEmployee.firstName} ${incrementEmployee.lastName}`,
+        previousBasicSalary: currentBasicSalary,
+        incrementAmount,
+        incrementPercentage,
+        newBasicSalary,
+        effectiveDate: incrementEffectiveDate,
+        reason: incrementReason.trim(),
+        approvedBy: `${currentUser.firstName} ${currentUser.lastName}`,
+        createdAt,
+      }),
+    });
+    if (response.ok) {
+      addToast('success', 'Salary Increment Applied', `${incrementEmployee.firstName}'s basic salary is now ${formatINR(newBasicSalary)}.`);
+      setIsIncrementOpen(false);
+    } else {
+      addToast('error', 'Increment Not Saved', 'The salary update could not be recorded in the database.');
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       
@@ -114,6 +159,16 @@ export const PayrollView: React.FC = () => {
         {isAdmin && (
           <div className="flex items-center gap-2">
             <button
+              onClick={() => {
+                setIncrementEmployeeId(employees[0]?.employeeId || '');
+                setIsIncrementOpen(true);
+              }}
+              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs shadow-md shadow-amber-500/30 flex items-center gap-1.5 transition-all"
+            >
+              <Percent className="w-4 h-4" />
+              <span>Salary Increment</span>
+            </button>
+            <button
               onClick={() => generateMonthlyPayroll('February 2026')}
               className="px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-600 text-white font-semibold text-xs shadow-md shadow-teal-500/30 flex items-center gap-1.5 transition-all hover:scale-105"
             >
@@ -123,6 +178,31 @@ export const PayrollView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {isIncrementOpen && isAdmin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Salary Increment</h2>
+                <p className="mt-1 text-xs text-slate-500">Apply a salary hike and save the HR approval history.</p>
+              </div>
+              <button type="button" onClick={() => setIsIncrementOpen(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close salary increment"> <X className="w-4 h-4" /> </button>
+            </div>
+            <form onSubmit={handleSalaryIncrement} className="mt-5 space-y-3">
+              <label className="block text-xs font-semibold text-slate-700">Employee<select value={incrementEmployeeId} onChange={(event) => setIncrementEmployeeId(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-xs font-normal text-slate-800" required>{employees.filter((employee) => employee.status !== 'Terminated').map((employee) => <option key={employee.id} value={employee.employeeId}>{employee.firstName} {employee.lastName} ({employee.employeeId})</option>)}</select></label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block text-xs font-semibold text-slate-700">Current Basic<input type="text" value={formatINR(currentBasicSalary)} readOnly className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-600" /></label>
+                <label className="block text-xs font-semibold text-slate-700">Hike %<input type="number" min="0.1" step="0.1" value={incrementPercentage} onChange={(event) => setIncrementPercentage(Number(event.target.value))} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-xs text-slate-800" required /></label>
+              </div>
+              <div className="rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-800">New Basic Salary: <strong>{formatINR(newBasicSalary)}</strong> (+{formatINR(incrementAmount)})</div>
+              <label className="block text-xs font-semibold text-slate-700">Effective Date<input type="date" value={incrementEffectiveDate} onChange={(event) => setIncrementEffectiveDate(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-xs font-normal text-slate-800" required /></label>
+              <label className="block text-xs font-semibold text-slate-700">Reason<textarea value={incrementReason} onChange={(event) => setIncrementReason(event.target.value)} rows={3} className="mt-1 w-full rounded-xl border border-slate-300 p-3 text-xs font-normal text-slate-800" required /></label>
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-3"><button type="button" onClick={() => setIsIncrementOpen(false)} className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100">Cancel</button><button type="submit" className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-600">Apply Increment</button></div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Salary Overview Cards for Current Persona */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -136,15 +216,15 @@ export const PayrollView: React.FC = () => {
             </div>
           </div>
           <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-display">
-            ${currentEmpGross.toLocaleString()}
+            {formatINR(currentEmpGross)}
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            Basic ${(currentUser.salaryStructure?.basicSalary || 0).toLocaleString()} + Allowances ${(
+            Basic {formatINR(currentUser.salaryStructure?.basicSalary || 0)} + Allowances {formatINR((
               (currentUser.salaryStructure?.hra || 0) +
               (currentUser.salaryStructure?.conveyanceAllowance || 0) +
               (currentUser.salaryStructure?.medicalAllowance || 0) +
               (currentUser.salaryStructure?.specialAllowance || 0)
-            ).toLocaleString()}
+            ))}
           </div>
         </div>
 
@@ -157,10 +237,10 @@ export const PayrollView: React.FC = () => {
             </div>
           </div>
           <div className="text-2xl sm:text-3xl font-extrabold text-rose-700 font-display">
-            -${currentEmpDeductions.toLocaleString()}
+            -{formatINR(currentEmpDeductions)}
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            PF (${(currentUser.salaryStructure?.providentFund || 0).toLocaleString()}) + TDS (${(currentUser.salaryStructure?.incomeTax || 0).toLocaleString()}) + Tax (${(currentUser.salaryStructure?.professionalTax || 0).toLocaleString()})
+            PF ({formatINR(currentUser.salaryStructure?.providentFund || 0)}) + TDS ({formatINR(currentUser.salaryStructure?.incomeTax || 0)}) + Professional Tax ({formatINR(currentUser.salaryStructure?.professionalTax || 0)})
           </div>
         </div>
 
@@ -173,7 +253,7 @@ export const PayrollView: React.FC = () => {
             </div>
           </div>
           <div className="text-2xl sm:text-3xl font-extrabold text-teal-950 font-display">
-            ${currentEmpNet.toLocaleString()}
+            {formatINR(currentEmpNet)}
           </div>
           <div className="text-xs text-teal-800 mt-1 flex items-center gap-1 font-medium">
             <CheckCircle className="w-3.5 h-3.5 text-teal-600" />
@@ -269,15 +349,15 @@ export const PayrollView: React.FC = () => {
                       </td>
 
                       <td className="py-3 px-4 font-semibold text-slate-900">
-                        ${gross.toLocaleString()}
+                        {formatINR(gross)}
                       </td>
 
                       <td className="py-3 px-4 font-semibold text-rose-600">
-                        -${deductions.toLocaleString()}
+                        -{formatINR(deductions)}
                       </td>
 
                       <td className="py-3 px-4 font-bold text-emerald-700 text-sm">
-                        ${net.toLocaleString()}
+                        {formatINR(net)}
                       </td>
 
                       <td className="py-3 px-4">
@@ -326,7 +406,7 @@ export const PayrollView: React.FC = () => {
         const otherDeds = selectedPayslipForModal.otherDeductions ?? (deductions - pf - tax);
         const workedDays = selectedPayslipForModal.workedDays ?? 22;
         const lopDays = selectedPayslipForModal.lopDays ?? 0;
-        const bankName = matchingEmployee?.bankDetails?.bankName || 'Corporate Bank';
+        const bankName = matchingEmployee?.bankDetails?.bankName || 'Indian Bank';
         const accountMasked = selectedPayslipForModal.bankAccountMasked || matchingEmployee?.bankDetails?.accountNumberMasked || '•••• •••• •••• 9823';
 
         return (
@@ -381,10 +461,10 @@ export const PayrollView: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 mt-1">
-                      Dayflow Technologies Inc. • 100 Market St, San Francisco, CA
+                      Dayflow Technologies India Pvt. Ltd. • 14th Floor, MG Road, Bengaluru, Karnataka 560001
                     </p>
                     <p className="text-[10px] text-slate-400">
-                      Tax ID: {selectedPayslipForModal.panNumber || 'US-EIN-99201928'} • support@dayflow.corp
+                      PAN: {selectedPayslipForModal.panNumber || 'ABCDE1234F'} • support@dayflow.in
                     </p>
                   </div>
 
@@ -448,19 +528,19 @@ export const PayrollView: React.FC = () => {
                     <div className="space-y-1.5 text-xs">
                       <div className="flex justify-between py-1 border-b border-slate-100">
                         <span className="text-slate-600">Basic Salary</span>
-                        <span className="font-semibold text-slate-900">${basic.toLocaleString()}</span>
+                        <span className="font-semibold text-slate-900">{formatINR(basic)}</span>
                       </div>
                       <div className="flex justify-between py-1 border-b border-slate-100">
                         <span className="text-slate-600">House Rent Allowance (HRA)</span>
-                        <span className="font-semibold text-slate-900">${hra.toLocaleString()}</span>
+                        <span className="font-semibold text-slate-900">{formatINR(hra)}</span>
                       </div>
                       <div className="flex justify-between py-1 border-b border-slate-100">
                         <span className="text-slate-600">Special & Other Allowances</span>
-                        <span className="font-semibold text-slate-900">${allowances.toLocaleString()}</span>
+                        <span className="font-semibold text-slate-900">{formatINR(allowances)}</span>
                       </div>
                       <div className="flex justify-between pt-2 text-xs font-bold text-slate-900">
                         <span>Total Gross Earnings</span>
-                        <span className="text-emerald-700">${gross.toLocaleString()}</span>
+                        <span className="text-emerald-700">{formatINR(gross)}</span>
                       </div>
                     </div>
                   </div>
@@ -473,19 +553,19 @@ export const PayrollView: React.FC = () => {
                     <div className="space-y-1.5 text-xs">
                       <div className="flex justify-between py-1 border-b border-slate-100">
                         <span className="text-slate-600">Provident Fund (PF)</span>
-                        <span className="font-semibold text-slate-900">${pf.toLocaleString()}</span>
+                        <span className="font-semibold text-slate-900">{formatINR(pf)}</span>
                       </div>
                       <div className="flex justify-between py-1 border-b border-slate-100">
                         <span className="text-slate-600">Income Tax (TDS)</span>
-                        <span className="font-semibold text-slate-900">${tax.toLocaleString()}</span>
+                        <span className="font-semibold text-slate-900">{formatINR(tax)}</span>
                       </div>
                       <div className="flex justify-between py-1 border-b border-slate-100">
                         <span className="text-slate-600">Professional & Other Tax</span>
-                        <span className="font-semibold text-slate-900">${otherDeds.toLocaleString()}</span>
+                        <span className="font-semibold text-slate-900">{formatINR(otherDeds)}</span>
                       </div>
                       <div className="flex justify-between pt-2 text-xs font-bold text-slate-900">
                         <span>Total Deductions</span>
-                        <span className="text-rose-600">-${deductions.toLocaleString()}</span>
+                        <span className="text-rose-600">-{formatINR(deductions)}</span>
                       </div>
                     </div>
                   </div>
@@ -499,10 +579,10 @@ export const PayrollView: React.FC = () => {
                       Net Take-Home Pay
                     </span>
                     <div className="text-3xl font-extrabold font-display text-teal-300">
-                      ${net.toLocaleString()}
+                      {formatINR(net)}
                     </div>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      (Gross Earnings ${gross.toLocaleString()} - Total Deductions ${deductions.toLocaleString()})
+                      (Gross Earnings {formatINR(gross)} - Total Deductions {formatINR(deductions)})
                     </p>
                   </div>
 

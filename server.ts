@@ -831,53 +831,96 @@ app.post('/api/employees', async (req, res) => {
   res.json({ success: true, employee: empRecord });
 });
 
-// Update an employee profile, including a stored avatar URL.
 app.put('/api/employees/:id', async (req, res) => {
   const { id } = req.params;
-  const updates = req.body || {};
-  const existing = inMemoryUsers.find((user) => user.id === id || user.employeeId === id);
-
-  if (!existing) {
-    return res.status(404).json({ success: false, error: 'Employee not found.' });
-  }
-
-  const dbUpdates: Record<string, unknown> = {};
-  if (updates.employeeId !== undefined) dbUpdates.employee_id = updates.employeeId;
-  if (updates.email !== undefined) dbUpdates.email = String(updates.email).trim().toLowerCase();
-  if (updates.firstName !== undefined) dbUpdates.first_name = updates.firstName;
-  if (updates.lastName !== undefined) dbUpdates.last_name = updates.lastName;
-  if (updates.role !== undefined) dbUpdates.role = updates.role;
-  if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
-  if (updates.avatar !== undefined) dbUpdates.avatar = updates.avatar;
-  if (updates.status !== undefined) dbUpdates.status = updates.status;
-  if (updates.jobDetails !== undefined) {
-    dbUpdates.job_details = updates.jobDetails;
-    dbUpdates.department = updates.jobDetails.department || existing.department;
-  }
-  if (updates.personalDetails !== undefined) dbUpdates.personal_details = updates.personalDetails;
-  if (updates.salaryStructure !== undefined) dbUpdates.salary_structure = updates.salaryStructure;
-  if (updates.leaveBalance !== undefined) dbUpdates.leave_balance = updates.leaveBalance;
-  if (updates.bankDetails !== undefined) dbUpdates.bank_details = updates.bankDetails;
+  const salaryStructure = req.body?.salaryStructure;
+  if (!salaryStructure) return res.status(400).json({ success: false, error: 'salaryStructure is required.' });
 
   const sb = getSupabase();
-  if (!sb) {
-    return res.status(503).json({ success: false, error: 'Database is unavailable. Configure Supabase server credentials.' });
+  if (sb) {
+    const { error } = await sb.from('users').update({ salary_structure: salaryStructure }).or(`id.eq.${id},employee_id.eq.${id}`);
+    if (error) return res.status(500).json({ success: false, error: error.message });
   }
 
-  const { error } = await sb.from('users').update(dbUpdates).or(`id.eq.${id},employee_id.eq.${id}`);
-  if (error) {
-    return res.status(500).json({ success: false, error: error.message });
+  inMemoryUsers = inMemoryUsers.map((user) => user.id === id || user.employeeId === id ? { ...user, salaryStructure } : user);
+  return res.json({ success: true });
+});
+
+app.post('/api/salary-increments', async (req, res) => {
+  const increment = req.body || {};
+  const required = ['id', 'employeeId', 'employeeName', 'previousBasicSalary', 'incrementAmount', 'newBasicSalary', 'effectiveDate', 'reason', 'approvedBy'];
+  if (required.some((field) => increment[field] === undefined || increment[field] === '')) {
+    return res.status(400).json({ success: false, error: 'Complete salary increment details are required.' });
   }
 
-  const updatedEmployee: UserRecord = {
-    ...existing,
-    ...updates,
-    email: updates.email !== undefined ? String(updates.email).trim().toLowerCase() : existing.email,
-    department: updates.jobDetails?.department || updates.department || existing.department,
+  const row = {
+    id: String(increment.id),
+    employee_id: String(increment.employeeId),
+    employee_name: String(increment.employeeName),
+    previous_basic_salary: Number(increment.previousBasicSalary),
+    increment_amount: Number(increment.incrementAmount),
+    increment_percentage: Number(increment.incrementPercentage || 0),
+    new_basic_salary: Number(increment.newBasicSalary),
+    effective_date: String(increment.effectiveDate),
+    reason: String(increment.reason),
+    approved_by: String(increment.approvedBy),
+    created_at: increment.createdAt || new Date().toISOString(),
   };
-  inMemoryUsers = inMemoryUsers.map((user) => user.id === existing.id ? updatedEmployee : user);
 
-  return res.json({ success: true, employee: updatedEmployee });
+  const sb = getSupabase();
+  if (sb) {
+    const { error } = await sb.from('salary_increments').insert([row]);
+    if (error) return res.status(500).json({ success: false, error: error.message });
+  }
+  return res.json({ success: true, increment: row });
+});
+
+app.post('/api/payslips', async (req, res) => {
+  const slip = req.body || {};
+  if (!slip.id || !slip.employeeId || !slip.month || !slip.year) {
+    return res.status(400).json({ success: false, error: 'Payslip id, employee, month, and year are required.' });
+  }
+  const row = {
+    id: String(slip.id),
+    employee_id: String(slip.employeeId),
+    employee_name: String(slip.employeeName || ''),
+    designation: slip.designation || null,
+    department: slip.department || null,
+    month: String(slip.month),
+    year: Number(slip.year),
+    working_days: Number(slip.workedDays ?? 22),
+    paid_days: Number((slip.workedDays ?? 22) - (slip.lopDays ?? 0)),
+    gross_earnings: Number(slip.grossEarnings || 0),
+    total_deductions: Number(slip.totalDeductions || 0),
+    net_pay: Number(slip.netPay || 0),
+    status: slip.status || 'Paid',
+    earnings: {
+      basicSalary: Number(slip.basicSalary || 0),
+      hra: Number(slip.hra || 0),
+      allowances: Number(slip.allowances || 0),
+    },
+    deductions: {
+      pfDeduction: Number(slip.pfDeduction || 0),
+      taxDeduction: Number(slip.taxDeduction || 0),
+      otherDeductions: Number(slip.otherDeductions || 0),
+    },
+    payment_date: slip.paymentDate,
+  };
+  const sb = getSupabase();
+  if (sb) {
+    const { error } = await sb.from('payslips').upsert([row], { onConflict: 'id' });
+    if (error) return res.status(500).json({ success: false, error: error.message });
+  }
+  return res.json({ success: true, payslip: row });
+});
+
+app.get('/api/payslips', async (_req, res) => {
+  const sb = getSupabase();
+  if (sb) {
+    const { data, error } = await sb.from('payslips').select('*').order('year', { ascending: false }).order('month', { ascending: false });
+    if (!error && data) return res.json({ success: true, payslips: data });
+  }
+  return res.json({ success: true, payslips: [] });
 });
 
 // Auth: Logout (Record audit log & destroy session)
@@ -1229,14 +1272,14 @@ INSERT INTO public.users (
     'V',
     'admin',
     'Human Resources',
-    '+1 (555) 700-6413',
+    '+91 98765 70001',
     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     'Active',
     '{"designation":"Lead System Administrator & HR Director","department":"Human Resources","dateOfJoining":"2021-01-10","employmentType":"Full-Time","workLocation":"Hybrid","managerName":"Board of Directors","managerId":"EXEC-001"}'::jsonb,
-    '{"dob":"1992-07-14","gender":"Male","address":"100 Silicon Way, Executive Suite 800","city":"San Francisco, CA","country":"United States","emergencyContactName":"Primary Contact","emergencyContactPhone":"+1 (555) 700-0099","emergencyContactRelation":"Family","bloodGroup":"O+","nationality":"American"}'::jsonb,
-    '{"basicSalary":9500,"hra":3800,"conveyanceAllowance":800,"medicalAllowance":600,"specialAllowance":2500,"providentFund":1140,"professionalTax":200,"incomeTax":1900,"currency":"USD"}'::jsonb,
+    '{"dob":"1992-07-14","gender":"Male","address":"16 Residency Road, MG Road, Bengaluru, Karnataka 560025","city":"Bengaluru, Karnataka","country":"India","emergencyContactName":"Primary Contact","emergencyContactPhone":"+91 98765 70009","emergencyContactRelation":"Family","bloodGroup":"O+","nationality":"Indian"}'::jsonb,
+    '{"basicSalary":95000,"hra":38000,"conveyanceAllowance":8000,"medicalAllowance":4000,"specialAllowance":25000,"providentFund":1800,"professionalTax":200,"incomeTax":19000,"currency":"INR"}'::jsonb,
     '{"paidLeave":{"total":24,"used":2,"remaining":22},"sickLeave":{"total":12,"used":0,"remaining":12},"casualLeave":{"total":8,"used":1,"remaining":7},"unpaidLeave":{"used":0}}'::jsonb,
-    '{"bankName":"Dayflow Federal Commercial Bank","accountNumberMasked":"•••• •••• •••• 7001","ifscOrRouting":"DFCB000701","panOrTaxId":"US-TAX-SARVESH7"}'::jsonb
+    '{"bankName":"HDFC Bank","accountNumberMasked":"XXXX XXXX 7001","ifscOrRouting":"HDFC0000701","panOrTaxId":"ABCDE1234F"}'::jsonb
 ) ON CONFLICT (email) DO UPDATE SET role = 'admin', status = 'Active';
 
 -- 7. Enable Storage Buckets for Documents & Avatars

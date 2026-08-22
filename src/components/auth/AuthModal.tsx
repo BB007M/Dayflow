@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useHR } from '../../context/HRContext';
-import { ProfilePlaceholder } from '../common/ProfilePlaceholder';
 import { UserRole } from '../../types';
 import { 
   X, 
@@ -14,7 +13,6 @@ import {
   Eye,
   EyeOff,
   ArrowRight,
-  Database,
   Info
 } from 'lucide-react';
 
@@ -23,9 +21,6 @@ export const AuthModal: React.FC = () => {
     isAuthModalOpen, 
     closeAuthModal, 
     signIn, 
-    employees, 
-    switchUser,
-    isDbConnected,
     currentUser
   } = useHR();
 
@@ -54,11 +49,6 @@ export const AuthModal: React.FC = () => {
     }
   };
 
-  const handleQuickPresetLogin = (emp: typeof employees[0]) => {
-    switchUser(emp.id);
-    closeAuthModal();
-  };
-
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden transition-all">
@@ -82,17 +72,12 @@ export const AuthModal: React.FC = () => {
               <span className="font-bold text-lg font-display tracking-tight">Dayflow HRMS</span>
             </div>
 
-            {/* DB Status Badge */}
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/10 backdrop-blur-md text-[11px] font-medium text-emerald-200 border border-emerald-400/30">
-              <Database className="w-3 h-3 text-emerald-300" />
-              <span>{isDbConnected ? 'Supabase Active' : 'Database Offline'}</span>
-            </div>
           </div>
           <h2 className="text-xl font-bold text-white mt-2">
             Sign In to Workspace
           </h2>
           <p className="text-xs text-purple-100 mt-1">
-            Secure workspace authentication backed by the Dayflow database.
+            Secure workspace authentication for your Dayflow account.
           </p>
         </div>
 
@@ -196,40 +181,6 @@ export const AuthModal: React.FC = () => {
               </span>
             </div>
 
-            {/* Quick Demo Switcher */}
-            <div className="pt-3 border-t border-slate-100">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                Quick Sign-In Switcher
-              </div>
-              <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                {employees.slice(0, 4).map((emp) => (
-                  <button
-                    key={emp.id}
-                    type="button"
-                    onClick={() => handleQuickPresetLogin(emp)}
-                    className="w-full flex items-center justify-between p-2 rounded-xl bg-slate-50 hover:bg-purple-50 hover:border-purple-200 border border-slate-200/60 transition-all text-left group cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <ProfilePlaceholder label={`${emp.firstName} ${emp.lastName}`} className="w-7 h-7 rounded-full shrink-0" />
-                      <div className="truncate">
-                        <div className="text-xs font-semibold text-slate-800 group-hover:text-purple-900 truncate flex items-center gap-1.5">
-                          {emp.firstName} {emp.lastName}
-                          {emp.role === 'admin' && (
-                            <span className="text-[9px] px-1.5 py-0.2 bg-purple-100 text-purple-700 rounded font-bold">
-                              Admin
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[10px] text-slate-400 truncate">{emp.email}</div>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-medium text-purple-600 group-hover:underline shrink-0">
-                      Switch &rarr;
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
           </form>
         </div>
       </div>

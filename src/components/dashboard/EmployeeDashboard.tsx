@@ -1,5 +1,6 @@
 import React from 'react';
 import { useHR } from '../../context/HRContext';
+import { formatINR } from '../../currency';
 import { formatWorkedHours } from '../../time';
 import { 
   Clock, 
@@ -444,11 +445,11 @@ export const EmployeeDashboard: React.FC = () => {
                     {myLatestPayslip.month} {myLatestPayslip.year || ''} Net Disbursed
                   </div>
                   <div className="text-2xl font-bold text-purple-950 dark:text-purple-200 font-display mt-0.5">
-                    ${net.toLocaleString()}
+                    {formatINR(net)}
                   </div>
                   <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 flex justify-between pt-2 border-t border-purple-200/50 dark:border-purple-800/40">
-                    <span>Gross: ${gross.toLocaleString()}</span>
-                    <span>Deductions: ${deductions.toLocaleString()}</span>
+                    <span>Gross: {formatINR(gross)}</span>
+                    <span>Deductions: {formatINR(deductions)}</span>
                   </div>
                 </div>
 

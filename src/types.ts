@@ -41,6 +41,20 @@ export interface SalaryStructure {
   currency: string;
 }
 
+export interface SalaryIncrement {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  previousBasicSalary: number;
+  incrementAmount: number;
+  incrementPercentage: number;
+  newBasicSalary: number;
+  effectiveDate: string;
+  reason: string;
+  approvedBy: string;
+  createdAt: string;
+}
+
 export interface LeaveBalance {
   paidLeave: { total: number; used: number; remaining: number };
   sickLeave: { total: number; used: number; remaining: number };

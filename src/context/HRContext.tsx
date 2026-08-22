@@ -21,6 +21,7 @@ import {
   INITIAL_NOTIFICATIONS 
 } from '../data/initialData';
 import { LoginAuditLog } from '../types/auth';
+import { formatINR } from '../currency';
 
 interface ToastMessage {
   id: string;
@@ -117,16 +118,16 @@ interface HRContextType {
 const HRContext = createContext<HRContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  EMPLOYEES: 'dayflow_hrms_employees_v3',
-  ATTENDANCE: 'dayflow_hrms_attendance_v3',
-  LEAVES: 'dayflow_hrms_leaves_v3',
-  PAYSLIPS: 'dayflow_hrms_payslips_v3',
-  NOTIFICATIONS: 'dayflow_hrms_notifications_v3',
-  CURRENT_USER_ID: 'dayflow_hrms_current_user_id_v3',
-  AUTH_TOKEN: 'dayflow_hrms_auth_token_v3',
-  LAST_ACTIVITY: 'dayflow_hrms_last_activity_v3',
-  CHECK_IN_STATE: 'dayflow_hrms_checkin_state_v3',
-  THEME: 'dayflow_hrms_theme_v3',
+  EMPLOYEES: 'dayflow_hrms_employees_v2',
+  ATTENDANCE: 'dayflow_hrms_attendance_v2',
+  LEAVES: 'dayflow_hrms_leaves_v2',
+  PAYSLIPS: 'dayflow_hrms_payslips_v2',
+  NOTIFICATIONS: 'dayflow_hrms_notifications_v2',
+  CURRENT_USER_ID: 'dayflow_hrms_current_user_id_v2',
+  AUTH_TOKEN: 'dayflow_hrms_auth_token_v2',
+  LAST_ACTIVITY: 'dayflow_hrms_last_activity_v2',
+  CHECK_IN_STATE: 'dayflow_hrms_checkin_state_v2',
+  THEME: 'dayflow_hrms_theme_v2',
 };
 
 export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -350,6 +351,37 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
               ...leave,
               employeeAvatar: leave.employeeAvatar || current.find((item) => item.employeeId === leave.employeeId)?.employeeAvatar || '',
             })));
+          }
+        }
+
+        const payslipRes = await fetch('/api/payslips');
+        if (payslipRes.ok) {
+          const payslipData = await payslipRes.json();
+          if (Array.isArray(payslipData.payslips) && payslipData.payslips.length > 0) {
+            setPayslips(payslipData.payslips.map((slip: any) => ({
+              id: slip.id,
+              employeeId: slip.employee_id,
+              employeeName: slip.employee_name,
+              designation: slip.designation || '',
+              department: slip.department || 'Human Resources',
+              month: slip.month,
+              year: Number(slip.year),
+              paymentDate: slip.payment_date,
+              basicSalary: Number(slip.earnings?.basicSalary || 0),
+              hra: Number(slip.earnings?.hra || 0),
+              allowances: Number(slip.earnings?.allowances || 0),
+              grossEarnings: Number(slip.gross_earnings || 0),
+              pfDeduction: Number(slip.deductions?.pfDeduction || 0),
+              taxDeduction: Number(slip.deductions?.taxDeduction || 0),
+              otherDeductions: Number(slip.deductions?.otherDeductions || 0),
+              totalDeductions: Number(slip.total_deductions || 0),
+              netPay: Number(slip.net_pay || 0),
+              status: slip.status,
+              bankAccountMasked: '',
+              panNumber: '',
+              workedDays: Number(slip.working_days || 22),
+              lopDays: Number((slip.working_days || 22) - (slip.paid_days || 22)),
+            } as Payslip)));
           }
         }
       } catch (err) {
@@ -619,7 +651,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
             firstName: payload.firstName,
             lastName: payload.lastName,
             email: payload.email,
-            phone: '+1 (555) 000-1122',
+            phone: '+91 98765 00011',
             avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`,
             role: payload.role,
             jobDetails: {
@@ -635,12 +667,12 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
               dob: '1998-05-15',
               gender: 'Prefer not to say',
               address: '123 Enterprise Blvd',
-              city: 'San Francisco, CA',
-              country: 'United States',
+              city: 'Bengaluru, Karnataka',
+              country: 'India',
               emergencyContactName: 'Family Contact',
-              emergencyContactPhone: '+1 (555) 999-8877',
+              emergencyContactPhone: '+91 98765 99987',
               emergencyContactRelation: 'Guardian',
-              nationality: 'American',
+              nationality: 'Indian',
             },
             salaryStructure: {
               basicSalary: 6000,
@@ -651,7 +683,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
               providentFund: 720,
               professionalTax: 200,
               incomeTax: 1080,
-              currency: 'USD',
+              currency: 'INR',
             },
             leaveBalance: {
               paidLeave: { total: 18, used: 0, remaining: 18 },
@@ -662,10 +694,10 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
             documents: [],
             status: 'Active',
             bankDetails: {
-              bankName: 'Dayflow Federal Credit Union',
+              bankName: 'State Bank of India',
               accountNumberMasked: '•••• •••• •••• 1092',
               ifscOrRouting: 'DFCU0001',
-              panOrTaxId: 'US-TAX-NEW',
+              panOrTaxId: 'ABCDE1234F',
             },
           };
           setEmployees((prev) => [newEmp, ...prev]);
@@ -1515,6 +1547,12 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       return [...newSlips, ...filtered];
     });
 
+    Promise.all(newSlips.map((slip) => fetch('/api/payslips', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(slip),
+    }))).catch((error) => console.warn('Payslip database sync error:', error));
+
     const notif: NotificationItem = {
       id: `notif-admin-pay-${Date.now()}`,
       title: `${month} ${year} Payroll Executed`,
@@ -1530,7 +1568,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     const employeePayslipNotifs: NotificationItem[] = newSlips.map((slip) => ({
       id: `notif-slip-${slip.employeeId}-${Date.now()}`,
       title: `${month} ${year} Payslip Disbursed`,
-      message: `Your ${month} ${year} salary statement is ready. Net Pay: $${slip.netPay.toLocaleString()} credited.`,
+      message: `Your ${month} ${year} salary statement is ready. Net Pay: ${formatINR(slip.netPay)} credited.`,
       timestamp: 'Just now',
       isRead: false,
       type: 'payroll',

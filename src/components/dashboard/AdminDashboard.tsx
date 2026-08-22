@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useHR } from '../../context/HRContext';
+import { formatINR } from '../../currency';
 import { ProfilePlaceholder } from '../common/ProfilePlaceholder';
 import { 
   Users, 
@@ -222,7 +223,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
           <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-display">
-            ${totalMonthlyPayroll.toLocaleString()}
+            {formatINR(totalMonthlyPayroll)}
           </div>
           <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Across 6 departments
@@ -231,7 +232,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       </div>
 
-      {/* Main Grid: Pending Approvals Queue + Employee Quick Switcher */}
+      {/* Main Grid: Pending Approvals Queue + Employee Directory */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Left 2 Cols: Section 3.5.2 Leave Approvals Inbox */}
@@ -313,12 +314,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             )}
           </div>
 
-          {/* PDF Section 3.2.2: Employee List & Switch Ability */}
+          {/* PDF Section 3.2.2: Employee Directory */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-xs transition-colors">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <div>
                 <h3 className="font-bold text-slate-900 dark:text-white text-base font-display">
-                  Employee Directory & Quick Switch
+                  Employee Directory
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Switch context between team members or edit records</p>
               </div>
@@ -343,7 +344,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <th className="pb-2">Department</th>
                     <th className="pb-2">Designation</th>
                     <th className="pb-2">Status</th>
-                    <th className="pb-2 text-right pr-2">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -377,24 +377,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </span>
                       </td>
 
-                      <td className="py-2.5 text-right pr-2">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => switchUser(emp.id)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-purple-600 dark:hover:bg-purple-600 hover:text-white text-slate-700 dark:text-slate-200 text-[11px] font-semibold transition-colors cursor-pointer"
-                            title="Switch view to this employee"
-                          >
-                            Switch User
-                          </button>
-                          <button
-                            onClick={() => openEmployeeProfile(emp)}
-                            className="p-1 text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 rounded cursor-pointer"
-                            title="View / Edit Profile"
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
                     </tr>
                   ))}
                 </tbody>

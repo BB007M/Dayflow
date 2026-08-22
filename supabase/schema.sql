@@ -93,6 +93,21 @@ CREATE TABLE IF NOT EXISTS public.attendance_logs (
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- 6. Create 'salary_increments' table (HR salary hike history)
+CREATE TABLE IF NOT EXISTS public.salary_increments (
+    id TEXT PRIMARY KEY,
+    employee_id TEXT NOT NULL,
+    employee_name TEXT NOT NULL,
+    previous_basic_salary NUMERIC NOT NULL,
+    increment_amount NUMERIC NOT NULL,
+    increment_percentage NUMERIC NOT NULL,
+    new_basic_salary NUMERIC NOT NULL,
+    effective_date DATE NOT NULL,
+    reason TEXT NOT NULL,
+    approved_by TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- 6. Insert Primary Admin Account (Sarvesh V)
 INSERT INTO public.users (
     id, employee_id, email, password_hash, first_name, last_name, role, department, phone, avatar, status, job_details, personal_details, salary_structure, leave_balance, bank_details
@@ -105,14 +120,14 @@ INSERT INTO public.users (
     'V',
     'admin',
     'Human Resources',
-    '+1 (555) 700-6413',
+    '+91 98765 70001',
     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     'Active',
     '{"designation":"Lead System Administrator & HR Director","department":"Human Resources","dateOfJoining":"2021-01-10","employmentType":"Full-Time","workLocation":"Hybrid","managerName":"Board of Directors","managerId":"EXEC-001"}'::jsonb,
-    '{"dob":"1992-07-14","gender":"Male","address":"100 Silicon Way, Executive Suite 800","city":"San Francisco, CA","country":"United States","emergencyContactName":"Primary Contact","emergencyContactPhone":"+1 (555) 700-0099","emergencyContactRelation":"Family","bloodGroup":"O+","nationality":"American"}'::jsonb,
-    '{"basicSalary":9500,"hra":3800,"conveyanceAllowance":800,"medicalAllowance":600,"specialAllowance":2500,"providentFund":1140,"professionalTax":200,"incomeTax":1900,"currency":"USD"}'::jsonb,
+    '{"dob":"1992-07-14","gender":"Male","address":"16 Residency Road, MG Road, Bengaluru, Karnataka 560025","city":"Bengaluru, Karnataka","country":"India","emergencyContactName":"Primary Contact","emergencyContactPhone":"+91 98765 70009","emergencyContactRelation":"Family","bloodGroup":"O+","nationality":"Indian"}'::jsonb,
+    '{"basicSalary":95000,"hra":38000,"conveyanceAllowance":8000,"medicalAllowance":4000,"specialAllowance":25000,"providentFund":1800,"professionalTax":200,"incomeTax":19000,"currency":"INR"}'::jsonb,
     '{"paidLeave":{"total":24,"used":2,"remaining":22},"sickLeave":{"total":12,"used":0,"remaining":12},"casualLeave":{"total":8,"used":1,"remaining":7},"unpaidLeave":{"used":0}}'::jsonb,
-    '{"bankName":"Dayflow Federal Commercial Bank","accountNumberMasked":"•••• •••• •••• 7001","ifscOrRouting":"DFCB000701","panOrTaxId":"US-TAX-SARVESH7"}'::jsonb
+    '{"bankName":"HDFC Bank","accountNumberMasked":"XXXX XXXX 7001","ifscOrRouting":"HDFC0000701","panOrTaxId":"ABCDE1234F"}'::jsonb
 ) ON CONFLICT (email) DO UPDATE SET role = 'admin', status = 'Active';
 
 -- 7. Enable Storage Buckets for Documents & Avatars
@@ -131,5 +146,6 @@ ON CONFLICT (id) DO NOTHING;
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.login_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.salary_increments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.leave_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payslips ENABLE ROW LEVEL SECURITY;
