@@ -109,7 +109,7 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onCl
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden transition-all my-6">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 max-w-2xl w-full overflow-hidden transition-all my-6">
         
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 p-6 text-white relative">
@@ -138,58 +138,58 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onCl
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">First Name *</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">First Name *</label>
               <input
                 type="text"
                 placeholder="e.g. Jordan"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-purple-600 outline-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 focus:border-purple-600 outline-none"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Last Name *</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">Last Name *</label>
               <input
                 type="text"
                 placeholder="e.g. Miller"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-purple-600 outline-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 focus:border-purple-600 outline-none"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Employee ID *</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">Employee ID *</label>
               <input
                 type="text"
                 value={employeeId}
                 onChange={(e) => setEmployeeId(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-300 focus:border-purple-600 outline-none"
+                className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:border-purple-600 outline-none"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Work Email *</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">Work Email *</label>
               <input
                 type="email"
                 placeholder="jordan.miller@dayflow.corp"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-purple-600 outline-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 focus:border-purple-600 outline-none"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Department</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">Department</label>
               <select
                 value={department}
                 onChange={(e) => setDepartment(e.target.value as Department)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
               >
                 <option value="Engineering">Engineering</option>
                 <option value="Product & Design">Product & Design</option>
@@ -201,21 +201,21 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onCl
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Designation</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">Designation</label>
               <input
                 type="text"
                 value={designation}
                 onChange={(e) => setDesignation(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Access Role</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">Access Role</label>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as UserRole)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
               >
                 <option value="employee">Regular Employee</option>
                 <option value="admin">HR / Admin Officer</option>
@@ -223,11 +223,11 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onCl
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Work Mode</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">Work Mode</label>
               <select
                 value={workLocation}
                 onChange={(e) => setWorkLocation(e.target.value as WorkLocation)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
               >
                 <option value="Hybrid">Hybrid</option>
                 <option value="Remote">Remote</option>
@@ -236,31 +236,31 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onCl
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Monthly Base Salary ($)</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">Monthly Base Salary ($)</label>
               <input
                 type="number"
                 value={basicSalary}
                 onChange={(e) => setBasicSalary(Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Office Location</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">Office Location</label>
               <input
                 type="text"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
               />
             </div>
 
             {/* Login Credentials Provisioning */}
-            <div className="sm:col-span-2 p-3.5 rounded-2xl bg-purple-50/70 border border-purple-200/80">
+            <div className="sm:col-span-2 p-3.5 rounded-2xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200/80 dark:border-purple-800/60">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <KeyRound className="w-4 h-4 text-purple-600" />
-                  <span className="text-xs font-bold text-slate-800">Initial Login Password</span>
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-100">Initial Login Password</span>
                 </div>
                 <button
                   type="button"
@@ -276,7 +276,7 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onCl
                   type={showPassword ? 'text' : 'password'}
                   value={initialPassword}
                   onChange={(e) => setInitialPassword(e.target.value)}
-                  className="w-full pl-9 pr-10 py-2 text-xs font-mono rounded-xl bg-white border border-purple-200 focus:border-purple-600 outline-none text-slate-900"
+                  className="w-full pl-9 pr-10 py-2 text-xs font-mono rounded-xl bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 focus:border-purple-600 outline-none text-slate-900 dark:text-slate-100"
                   required
                 />
                 <button
@@ -287,18 +287,18 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onCl
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              <p className="text-[10px] text-slate-500 mt-1.5">
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5">
                 The employee will use this password alongside their work email (<strong>{email || 'provided above'}</strong>) to sign in.
               </p>
             </div>
 
           </div>
 
-          <div className="pt-4 border-t border-slate-200 flex justify-end gap-2">
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+              className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
             >
               Cancel
             </button>
