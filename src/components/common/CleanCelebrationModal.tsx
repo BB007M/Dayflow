@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { ProfilePlaceholder } from './ProfilePlaceholder';
 import { 
   CheckCircle2, 
   Calendar, 
@@ -281,17 +282,7 @@ export const CleanCelebrationModal: React.FC = () => {
                   transition={{ delay: 0.32 }}
                   className="flex items-center justify-center gap-2 mb-5 text-xs text-slate-600"
                 >
-                  {celebrationData.employeeAvatar ? (
-                    <img
-                      src={celebrationData.employeeAvatar}
-                      alt={celebrationData.employeeName}
-                      className="w-5 h-5 rounded-full object-cover border border-slate-300"
-                    />
-                  ) : (
-                    <div className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-bold">
-                      {celebrationData.employeeName.charAt(0)}
-                    </div>
-                  )}
+                  <ProfilePlaceholder label={celebrationData.employeeName} className="w-5 h-5 rounded-full text-[8px]" />
                   <span className="font-medium text-slate-700">For {celebrationData.employeeName}</span>
                 </motion.div>
               )}

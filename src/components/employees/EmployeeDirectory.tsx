@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useHR } from '../../context/HRContext';
+import { ProfilePlaceholder } from '../common/ProfilePlaceholder';
 import { Department, Employee, UserRole } from '../../types';
 import { 
   Users, 
@@ -315,13 +316,7 @@ export const EmployeeDirectory: React.FC<EmployeeDirectoryProps> = ({ onOpenAddE
                   {/* Top card bar */}
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="relative">
-                      <img
-                        src={emp.avatar}
-                        alt={emp.firstName}
-                        className={`w-14 h-14 rounded-2xl object-cover ring-2 shadow-2xs ${
-                          isTerminated ? 'ring-rose-200 grayscale-50 opacity-80' : 'ring-slate-100'
-                        }`}
-                      />
+                      <ProfilePlaceholder label={`${emp.firstName} ${emp.lastName}`} className={`w-14 h-14 text-base rounded-2xl ring-2 shadow-2xs ${isTerminated ? 'ring-rose-200 opacity-80' : 'ring-slate-100'}`} />
                       <span
                         className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white ${
                           isTerminated ? 'bg-rose-500' : 'bg-emerald-500'
@@ -444,11 +439,7 @@ export const EmployeeDirectory: React.FC<EmployeeDirectoryProps> = ({ onOpenAddE
                     <tr key={emp.id} className={`hover:bg-slate-50/80 transition-colors ${isTerminated ? 'bg-rose-50/30' : ''}`}>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
-                          <img
-                            src={emp.avatar}
-                            alt={emp.firstName}
-                            className={`w-9 h-9 rounded-xl object-cover ${isTerminated ? 'grayscale-50' : ''}`}
-                          />
+                          <ProfilePlaceholder label={`${emp.firstName} ${emp.lastName}`} className={`w-9 h-9 ${isTerminated ? 'opacity-80' : ''}`} />
                           <div>
                             <div className={`font-bold text-slate-900 ${isTerminated ? 'line-through text-slate-500' : ''}`}>
                               {emp.firstName} {emp.lastName}
@@ -557,11 +548,7 @@ export const EmployeeDirectory: React.FC<EmployeeDirectoryProps> = ({ onOpenAddE
               
               {/* Target Employee Summary Card */}
               <div className="p-3.5 rounded-2xl bg-rose-50/70 border border-rose-200 flex items-center gap-3.5">
-                <img
-                  src={employeeToTerminate.avatar}
-                  alt={employeeToTerminate.firstName}
-                  className="w-12 h-12 rounded-xl object-cover ring-2 ring-rose-200 shadow-2xs"
-                />
+                <ProfilePlaceholder label={`${employeeToTerminate.firstName} ${employeeToTerminate.lastName}`} className="w-12 h-12 ring-2 ring-rose-200 shadow-2xs" />
                 <div className="min-w-0 flex-1 text-xs">
                   <div className="font-bold text-slate-900 text-sm truncate">
                     {employeeToTerminate.firstName} {employeeToTerminate.lastName}

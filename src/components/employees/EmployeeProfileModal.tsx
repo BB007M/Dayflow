@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useHR } from '../../context/HRContext';
+import { ProfilePlaceholder } from '../common/ProfilePlaceholder';
 import { Employee, Department, EmploymentType, WorkLocation } from '../../types';
 import { 
   X, 
@@ -222,31 +223,7 @@ export const EmployeeProfileModal: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 pr-0 sm:pr-36">
             <div className="relative group shrink-0">
-              <img
-                src={formData.avatar}
-                alt={formData.firstName}
-                className={`w-20 h-20 rounded-2xl object-cover ring-4 shadow-lg ${
-                  isTerminated ? 'ring-rose-400/40 grayscale-40' : 'ring-white/20'
-                }`}
-              />
-              {isEditing && (
-                <label className="absolute inset-0 bg-black/60 rounded-2xl flex flex-col items-center justify-center cursor-pointer text-[10px] text-white opacity-90 group-hover:opacity-100 transition-opacity">
-                  <Upload className="w-4 h-4 mb-0.5" />
-                  <span>Change</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const url = URL.createObjectURL(file);
-                        setFormData({ ...formData, avatar: url });
-                      }
-                    }}
-                  />
-                </label>
-              )}
+                <ProfilePlaceholder label={`${formData.firstName} ${formData.lastName}`} className={`w-20 h-20 text-lg rounded-2xl ring-4 shadow-lg ${isTerminated ? 'ring-rose-400/40' : 'ring-white/20'}`} />
             </div>
 
             <div className="text-center sm:text-left flex-1 min-w-0">

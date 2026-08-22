@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useHR } from '../../context/HRContext';
+import { ProfilePlaceholder } from '../common/ProfilePlaceholder';
 import { 
   Users, 
   Clock, 
@@ -271,11 +272,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     className="p-4 rounded-xl border border-purple-100 dark:border-purple-900/50 bg-purple-50/30 dark:bg-purple-950/25 hover:bg-purple-50/60 dark:hover:bg-purple-950/40 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                   >
                     <div className="flex items-start gap-3">
-                      <img
-                        src={req.employeeAvatar}
-                        alt={req.employeeName}
-                        className="w-10 h-10 rounded-xl object-cover ring-1 ring-purple-300 dark:ring-purple-700 shrink-0"
-                      />
+                      <ProfilePlaceholder label={req.employeeName} className="w-10 h-10 shrink-0 ring-1 ring-purple-300 dark:ring-purple-700" />
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="text-sm font-bold text-slate-900 dark:text-white">{req.employeeName}</h4>
@@ -354,11 +351,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <tr key={emp.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition-colors group">
                       <td className="py-2.5 pl-2">
                         <div className="flex items-center gap-2.5">
-                          <img
-                            src={emp.avatar}
-                            alt={emp.firstName}
-                            className="w-7 h-7 rounded-full object-cover border border-slate-200 dark:border-slate-700"
-                          />
+                          <ProfilePlaceholder label={`${emp.firstName} ${emp.lastName}`} className="w-7 h-7 rounded-full" />
                           <div>
                             <div className="font-bold text-slate-900 dark:text-slate-100">
                               {emp.firstName} {emp.lastName}

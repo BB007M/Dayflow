@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useHR } from '../../context/HRContext';
+import { ProfilePlaceholder } from './ProfilePlaceholder';
 import { formatWorkedSeconds } from '../../time';
 import { 
   Bell, 
@@ -96,8 +97,8 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 px-4 lg:px-6 py-3 transition-colors duration-200">
-      <div className="flex items-center justify-between gap-3 max-w-7xl mx-auto">
+    <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 px-3 sm:px-4 lg:px-6 py-2.5 sm:py-3 transition-colors duration-200">
+      <div className="flex min-w-0 items-center justify-between gap-2 sm:gap-3 max-w-7xl mx-auto">
         
         {/* Left: Mobile menu toggle + Logo / Tagline */}
         <div className="flex items-center gap-3">
@@ -111,14 +112,14 @@ export const Header: React.FC<HeaderProps> = ({
 
           <div 
             onClick={() => setActiveTab('dashboard')} 
-            className="flex items-center gap-2.5 cursor-pointer group"
+            className="flex min-w-0 items-center gap-2.5 cursor-pointer group"
           >
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-700 via-indigo-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-purple-500/20 group-hover:scale-105 transition-transform">
               <Layers className="w-5 h-5" />
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
-                <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white font-display">
+                <span className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white font-display">
                   dayflow
                 </span>
                 <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60">
@@ -168,11 +169,7 @@ export const Header: React.FC<HeaderProps> = ({
                     onClick={() => handleSelectSearchResult(emp)}
                     className="w-full flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800/80 rounded-lg text-left transition-colors"
                   >
-                    <img
-                      src={emp.avatar}
-                      alt={emp.firstName}
-                      className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700"
-                    />
+                    <ProfilePlaceholder label={`${emp.firstName} ${emp.lastName}`} className="w-8 h-8 rounded-full" />
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">
                         {emp.firstName} {emp.lastName}
@@ -190,7 +187,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Right: DB Logs, Punch Status, Theme Toggle, Notifications & Profile */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
           
           {/* Supabase DB Auth Logs Button */}
           <button
@@ -260,11 +257,7 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                 className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700 cursor-pointer"
               >
-                <img
-                  src={currentUser.avatar}
-                  alt={currentUser.firstName}
-                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-cover ring-2 ring-purple-500/20"
-                />
+                <ProfilePlaceholder label={`${currentUser.firstName} ${currentUser.lastName}`} className="w-7 h-7 sm:w-8 sm:h-8" />
                 <div className="hidden xl:flex flex-col text-left">
                   <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-tight">
                     {currentUser.firstName} {currentUser.lastName}

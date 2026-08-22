@@ -1,3 +1,4 @@
+import { getLocalDateKey } from '../time';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
   Employee, 
@@ -89,6 +90,7 @@ interface HRContextType {
     isHalfDay: boolean;
     reason: string;
   }) => void;
+  updateLeaveRequest: (leaveId: string, updates: Pick<LeaveRequest, 'leaveType' | 'startDate' | 'endDate' | 'totalDays' | 'isHalfDay' | 'reason'>) => void;
   reviewLeave: (leaveId: string, status: 'Approved' | 'Rejected', comments?: string) => void;
   
   // Employees & Profile
@@ -187,18 +189,14 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
-    if (!saved || saved === 'LOGGED_OUT' || saved === 'null' || ['emp-1', 'emp-2', 'emp-3', 'emp-4', 'emp-5', 'emp-6'].includes(saved)) {
-      return 'emp-sarvesh';
-    }
-    return saved;
+    if (!saved || saved === 'LOGGED_OUT' || saved === 'null' || ['emp-1', 'emp-2', 'emp-3', 'emp-4', 'emp-5', 'emp-6'].includes(saved)) return null;
+    return null;
   });
 
   const [sessionToken, setSessionToken] = useState<string | null>(() => {
     const savedUserId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
-    if (!savedUserId || savedUserId === 'LOGGED_OUT' || savedUserId === 'null') {
-      return null;
-    }
-    return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) || `sess-${Date.now()}`;
+    if (!savedUserId || savedUserId === 'LOGGED_OUT' || savedUserId === 'null') return null;
+    return null;
   });
 
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(() => {
@@ -294,8 +292,9 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       isOnBreak: false,
       checkInTimestamp: '08:45 AM',
       breakStartTimestamp: null,
-      accumulatedWorkedSeconds: 14400, // 4 hours
+      accumulatedWorkedSeconds: 0,
       accumulatedBreakSeconds: 0,
+      lastUpdatedAt: Date.now(),
     };
   });
 
@@ -320,6 +319,37 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
           const empData = await empRes.json();
           if (empData.employees && Array.isArray(empData.employees) && empData.employees.length > 0) {
             setEmployees(empData.employees);
+          }
+        }
+
+        const leaveRes = await fetch('/api/leaves');
+        if (leaveRes.ok) {
+          const leaveData = await leaveRes.json();
+          if (Array.isArray(leaveData.leaves) && leaveData.leaves.length > 0) {
+            setLeaveRequests((current) => leaveData.leaves.map((leave: any) => {
+              const employee = employees.find((item) => item.employeeId === leave.employee_id);
+              return {
+                id: leave.id,
+                employeeId: leave.employee_id,
+                employeeName: leave.employee_name,
+                employeeAvatar: employee?.avatar || '',
+                department: leave.department,
+                leaveType: leave.leave_type,
+                startDate: leave.start_date,
+                endDate: leave.end_date,
+                totalDays: Number(leave.total_days),
+                isHalfDay: Boolean(leave.is_half_day),
+                reason: leave.reason || '',
+                status: leave.status,
+                appliedAt: leave.applied_at,
+                reviewedBy: leave.reviewed_by,
+                reviewedAt: leave.reviewed_at,
+                adminComments: leave.admin_comments,
+              } as LeaveRequest;
+            }).map((leave) => ({
+              ...leave,
+              employeeAvatar: leave.employeeAvatar || current.find((item) => item.employeeId === leave.employeeId)?.employeeAvatar || '',
+            })));
           }
         }
       } catch (err) {
@@ -410,21 +440,44 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     localStorage.setItem(STORAGE_KEYS.CHECK_IN_STATE, JSON.stringify(checkInState));
   }, [checkInState]);
 
-  // Real-time second counter for active check-in
+  // Keep work and break time separate so lunch/rest periods never count as work.
   useEffect(() => {
     if (!checkInState.isCheckedIn) return;
     const interval = setInterval(() => {
+      const now = Date.now();
       setCheckInState((prev) => {
         if (!prev.isCheckedIn) return prev;
+        const elapsedSeconds = Math.max(0, Math.floor((now - (prev.lastUpdatedAt || now)) / 1000));
+        if (elapsedSeconds === 0) return prev;
         if (prev.isOnBreak) {
-          return { ...prev, accumulatedBreakSeconds: prev.accumulatedBreakSeconds + 1 };
+          return {
+            ...prev,
+            accumulatedBreakSeconds: prev.accumulatedBreakSeconds + elapsedSeconds,
+            lastUpdatedAt: now,
+          };
         } else {
-          return { ...prev, accumulatedWorkedSeconds: prev.accumulatedWorkedSeconds + 1 };
+          return {
+            ...prev,
+            accumulatedWorkedSeconds: prev.accumulatedWorkedSeconds + elapsedSeconds,
+            lastUpdatedAt: now,
+          };
         }
       });
+
+      const today = getLocalDateKey();
+      const activeWorkedHours = checkInState.accumulatedWorkedSeconds / 3600;
+      setAttendanceRecords((prev) => prev.map((record) => (
+        record.employeeId === currentUser?.employeeId && record.date === today
+          ? {
+              ...record,
+              totalHoursWorked: activeWorkedHours,
+              breakMinutes: Math.round(checkInState.accumulatedBreakSeconds / 60),
+            }
+          : record
+      )));
     }, 1000);
     return () => clearInterval(interval);
-  }, [checkInState.isCheckedIn, checkInState.isOnBreak]);
+  }, [checkInState.isCheckedIn, checkInState.isOnBreak, checkInState.accumulatedWorkedSeconds, checkInState.accumulatedBreakSeconds, checkInState.lastUpdatedAt, currentUser?.employeeId]);
 
   // Toast Helpers
   const addToast = (type: ToastMessage['type'], title: string, message?: string) => {
@@ -764,7 +817,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     if (!currentUser) return;
     const now = new Date();
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = getLocalDateKey(now);
 
     setCheckInState({
       isCheckedIn: true,
@@ -773,6 +826,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       breakStartTimestamp: null,
       accumulatedWorkedSeconds: 0,
       accumulatedBreakSeconds: 0,
+      lastUpdatedAt: Date.now(),
     });
 
     setAttendanceRecords((prev) => {
@@ -793,7 +847,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
             date: todayStr,
             checkInTime: timeStr,
             checkOutTime: null,
-            totalHoursWorked: 0.1,
+            totalHoursWorked: 0,
             breakMinutes: 0,
             status: 'present',
           },
@@ -824,14 +878,15 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     if (!currentUser) return;
     const now = new Date();
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-    const todayStr = now.toISOString().split('T')[0];
-    const hoursWorked = parseFloat((checkInState.accumulatedWorkedSeconds / 3600).toFixed(2));
+    const todayStr = getLocalDateKey(now);
+    const hoursWorked = checkInState.accumulatedWorkedSeconds / 3600;
     const breakMins = Math.round(checkInState.accumulatedBreakSeconds / 60);
 
     setCheckInState((prev) => ({
       ...prev,
       isCheckedIn: false,
       isOnBreak: false,
+      lastUpdatedAt: Date.now(),
     }));
 
     setAttendanceRecords((prev) => {
@@ -841,7 +896,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         updated[existingIndex] = {
           ...updated[existingIndex],
           checkOutTime: timeStr,
-          totalHoursWorked: Math.max(hoursWorked, 0.1),
+          totalHoursWorked: hoursWorked,
           breakMinutes: breakMins,
         };
         return updated;
@@ -883,6 +938,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
           ...prev,
           isOnBreak: true,
           breakStartTimestamp: timeStr,
+          lastUpdatedAt: Date.now(),
         };
       } else {
         addToast('success', 'Back from Break', `Welcome back! Resumed work at ${timeStr}`);
@@ -890,6 +946,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
           ...prev,
           isOnBreak: false,
           breakStartTimestamp: null,
+          lastUpdatedAt: Date.now(),
         };
       }
     });
@@ -930,7 +987,12 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        id: `att-log-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         employeeId: record.employeeId,
+        employeeName: employees.find((employee) => employee.employeeId === record.employeeId)?.firstName
+          ? `${employees.find((employee) => employee.employeeId === record.employeeId)?.firstName} ${employees.find((employee) => employee.employeeId === record.employeeId)?.lastName}`
+          : undefined,
+        email: employees.find((employee) => employee.employeeId === record.employeeId)?.email,
         date: record.date,
         actionType: 'MANUAL_PUNCH',
         checkInTime: record.checkInTime,
@@ -986,6 +1048,29 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
     setLeaveRequests((prev) => [newLeave, ...prev]);
 
+    // Persist the request and add a corresponding attendance audit event.
+    fetch('/api/leaves', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newLeave),
+    }).catch((error) => console.warn('Leave request sync error:', error));
+
+    fetch('/api/attendance/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: `att-leave-${newLeave.id}`,
+        employeeId: newLeave.employeeId,
+        employeeName: newLeave.employeeName,
+        email: currentUser.email,
+        date: newLeave.startDate,
+        actionType: 'LEAVE_REQUEST',
+        totalHoursWorked: 0,
+        breakMinutes: 0,
+        status: 'leave_pending',
+      }),
+    }).catch((error) => console.warn('Leave attendance log sync error:', error));
+
     // Create notification for Admin / HR
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
@@ -1036,6 +1121,17 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         return l;
       })
     );
+
+    fetch(`/api/leaves/${encodeURIComponent(leaveId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status,
+        reviewedBy: reviewer,
+        reviewedAt: new Date().toISOString(),
+        adminComments: comments,
+      }),
+    }).catch((error) => console.warn('Leave review sync error:', error));
 
     // If approved, update the employee's leave balance & attendance calendar
     if (status === 'Approved') {
@@ -1090,6 +1186,27 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         const filtered = prev.filter((r) => !newAttendanceUpdates.some((u) => u.employeeId === r.employeeId && u.date === r.date));
         return [...newAttendanceUpdates, ...filtered];
       });
+    } else if (status === 'Rejected' && targetLeave.status === 'Approved') {
+      setEmployees((prev) => prev.map((emp) => {
+        if (emp.employeeId !== targetLeave.employeeId) return emp;
+        const leaveBalance = { ...emp.leaveBalance };
+        if (targetLeave.leaveType === 'Paid') {
+          leaveBalance.paidLeave.used = Math.max(0, leaveBalance.paidLeave.used - targetLeave.totalDays);
+          leaveBalance.paidLeave.remaining = leaveBalance.paidLeave.total - leaveBalance.paidLeave.used;
+        } else if (targetLeave.leaveType === 'Sick') {
+          leaveBalance.sickLeave.used = Math.max(0, leaveBalance.sickLeave.used - targetLeave.totalDays);
+          leaveBalance.sickLeave.remaining = leaveBalance.sickLeave.total - leaveBalance.sickLeave.used;
+        } else if (targetLeave.leaveType === 'Casual') {
+          leaveBalance.casualLeave.used = Math.max(0, leaveBalance.casualLeave.used - targetLeave.totalDays);
+          leaveBalance.casualLeave.remaining = leaveBalance.casualLeave.total - leaveBalance.casualLeave.used;
+        } else if (targetLeave.leaveType === 'Unpaid') {
+          leaveBalance.unpaidLeave.used = Math.max(0, leaveBalance.unpaidLeave.used - targetLeave.totalDays);
+        }
+        return { ...emp, leaveBalance };
+      }));
+      setAttendanceRecords((prev) => prev.filter((record) => (
+        !(record.employeeId === targetLeave.employeeId && record.status === 'leave' && record.notes?.startsWith('Approved '))
+      )));
     }
 
     // Send notification to employee
@@ -1128,6 +1245,16 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       `Leave Request ${status}`,
       `Request for ${targetLeave.employeeName} has been ${status.toLowerCase()}.`
     );
+  };
+
+  const updateLeaveRequest = (leaveId: string, updates: Pick<LeaveRequest, 'leaveType' | 'startDate' | 'endDate' | 'totalDays' | 'isHalfDay' | 'reason'>) => {
+    setLeaveRequests((prev) => prev.map((leave) => leave.id === leaveId ? { ...leave, ...updates } : leave));
+    fetch(`/api/leaves/${encodeURIComponent(leaveId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    }).catch((error) => console.warn('Leave edit sync error:', error));
+    addToast('success', 'Leave Request Updated', 'The leave request was updated from Attendance.');
   };
 
   // Employee Profile Management
@@ -1450,7 +1577,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       isOnBreak: false,
       checkInTimestamp: '08:45 AM',
       breakStartTimestamp: null,
-      accumulatedWorkedSeconds: 14400,
+      accumulatedWorkedSeconds: 0,
       accumulatedBreakSeconds: 0,
     });
     localStorage.clear();
@@ -1514,6 +1641,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         toggleBreak,
         markAttendanceManual,
         applyLeave,
+        updateLeaveRequest,
         reviewLeave,
         openEmployeeProfile,
         closeEmployeeProfile,

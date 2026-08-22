@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useHR } from '../../context/HRContext';
+import { ProfilePlaceholder } from '../common/ProfilePlaceholder';
 import { UserRole } from '../../types';
 import { 
   X, 
@@ -209,11 +210,7 @@ export const AuthModal: React.FC = () => {
                     className="w-full flex items-center justify-between p-2 rounded-xl bg-slate-50 hover:bg-purple-50 hover:border-purple-200 border border-slate-200/60 transition-all text-left group cursor-pointer"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <img
-                        src={emp.avatar}
-                        alt={emp.firstName}
-                        className="w-7 h-7 rounded-full object-cover shrink-0"
-                      />
+                      <ProfilePlaceholder label={`${emp.firstName} ${emp.lastName}`} className="w-7 h-7 rounded-full shrink-0" />
                       <div className="truncate">
                         <div className="text-xs font-semibold text-slate-800 group-hover:text-purple-900 truncate flex items-center gap-1.5">
                           {emp.firstName} {emp.lastName}

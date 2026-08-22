@@ -188,6 +188,7 @@ export interface CheckInState {
   breakStartTimestamp: string | null;
   accumulatedWorkedSeconds: number;
   accumulatedBreakSeconds: number;
+  lastUpdatedAt?: number;
 }
 
 export interface CelebrationDetailItem {

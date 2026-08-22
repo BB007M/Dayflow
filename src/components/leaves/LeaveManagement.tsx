@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useHR } from '../../context/HRContext';
+import { ProfilePlaceholder } from '../common/ProfilePlaceholder';
 import { LeaveType, LeaveRequest, LeaveStatus } from '../../types';
 import { 
   CalendarDays, 
@@ -389,11 +390,7 @@ export const LeaveManagement: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-start gap-3 min-w-0">
-                      <img
-                        src={req.employeeAvatar}
-                        alt={req.employeeName}
-                        className="w-10 h-10 rounded-xl object-cover ring-1 ring-slate-200 shrink-0"
-                      />
+                      <ProfilePlaceholder label={req.employeeName} className="w-10 h-10 shrink-0" />
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-bold text-slate-900 text-xs sm:text-sm">

@@ -111,7 +111,7 @@ interface AttendanceLogRecord {
   employeeName?: string;
   email?: string;
   date: string;
-  actionType: 'CHECK_IN' | 'CHECK_OUT' | 'BREAK_START' | 'BREAK_END' | 'MANUAL_PUNCH';
+  actionType: 'CHECK_IN' | 'CHECK_OUT' | 'BREAK_START' | 'BREAK_END' | 'MANUAL_PUNCH' | 'LEAVE_REQUEST';
   checkInTime?: string | null;
   checkOutTime?: string | null;
   totalHoursWorked?: number;
@@ -176,6 +176,8 @@ let inMemoryAttendanceLogs: AttendanceLogRecord[] = [
     timestamp: new Date(Date.now() - 5.5 * 3600000).toISOString(),
   },
 ];
+
+let inMemoryLeaveRequests: any[] = [];
 
 let inMemorySessions = new Map<string, { userId: string; email: string; role: string; expiresAt: number }>();
 
@@ -853,6 +855,145 @@ app.post('/api/auth/logout', async (req, res) => {
     if (error) console.warn('Logout audit log failed:', error.message);
   }
   res.json({ success: true });
+});
+
+// Attendance telemetry: persist punch, break, regularization, and leave events.
+app.post('/api/attendance/log', async (req, res) => {
+  const body = req.body || {};
+  if (!body.employeeId || !body.date || !body.actionType) {
+    return res.status(400).json({ success: false, error: 'employeeId, date, and actionType are required.' });
+  }
+
+  const log: AttendanceLogRecord = {
+    id: body.id || `att-log-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    employeeId: String(body.employeeId),
+    employeeName: body.employeeName,
+    email: body.email,
+    date: String(body.date),
+    actionType: body.actionType,
+    checkInTime: body.checkInTime || null,
+    checkOutTime: body.checkOutTime || null,
+    totalHoursWorked: Number(body.totalHoursWorked || 0),
+    breakMinutes: Number(body.breakMinutes || 0),
+    status: String(body.status || 'present'),
+    ipAddress: String(req.ip || req.headers['x-forwarded-for'] || '127.0.0.1'),
+    userAgent: String(req.headers['user-agent'] || 'Dayflow Browser'),
+    timestamp: new Date().toISOString(),
+  };
+
+  const sb = getSupabase();
+  if (sb) {
+    const { error } = await sb.from('attendance_logs').insert([{
+      id: log.id,
+      employee_id: log.employeeId,
+      employee_name: log.employeeName,
+      email: log.email,
+      date: log.date,
+      action_type: log.actionType,
+      check_in_time: log.checkInTime,
+      check_out_time: log.checkOutTime,
+      total_hours_worked: log.totalHoursWorked,
+      break_minutes: log.breakMinutes,
+      status: log.status,
+      ip_address: log.ipAddress,
+      user_agent: log.userAgent,
+      timestamp: log.timestamp,
+    }]);
+    if (error) return res.status(500).json({ success: false, error: error.message });
+  }
+
+  inMemoryAttendanceLogs.unshift(log);
+  return res.json({ success: true, log });
+});
+
+app.get('/api/attendance/logs', async (_req, res) => {
+  const sb = getSupabase();
+  if (sb) {
+    const { data, error } = await sb.from('attendance_logs').select('*').order('timestamp', { ascending: false });
+    if (!error && data) return res.json({ success: true, logs: data });
+  }
+
+  return res.json({
+    success: true,
+    logs: inMemoryAttendanceLogs.map((log) => ({
+      id: log.id,
+      employee_id: log.employeeId,
+      employee_name: log.employeeName,
+      email: log.email,
+      date: log.date,
+      action_type: log.actionType,
+      check_in_time: log.checkInTime,
+      check_out_time: log.checkOutTime,
+      total_hours_worked: log.totalHoursWorked,
+      break_minutes: log.breakMinutes,
+      status: log.status,
+      ip_address: log.ipAddress,
+      user_agent: log.userAgent,
+      timestamp: log.timestamp,
+    })),
+  });
+});
+
+app.post('/api/leaves', async (req, res) => {
+  const body = req.body || {};
+  if (!body.id || !body.employeeId || !body.startDate || !body.endDate || !body.leaveType) {
+    return res.status(400).json({ success: false, error: 'Leave id, employee, dates, and leave type are required.' });
+  }
+
+  const leave = {
+    id: String(body.id),
+    employee_id: String(body.employeeId),
+    employee_name: String(body.employeeName || ''),
+    department: body.department || null,
+    leave_type: String(body.leaveType),
+    start_date: String(body.startDate),
+    end_date: String(body.endDate),
+    total_days: Number(body.totalDays || 0),
+    is_half_day: Boolean(body.isHalfDay),
+    reason: String(body.reason || ''),
+    status: body.status || 'Pending',
+    applied_at: body.appliedAt || new Date().toISOString(),
+  };
+
+  const sb = getSupabase();
+  if (sb) {
+    const { error } = await sb.from('leave_requests').upsert([leave], { onConflict: 'id' });
+    if (error) return res.status(500).json({ success: false, error: error.message });
+  }
+  inMemoryLeaveRequests = [leave, ...inMemoryLeaveRequests.filter((item) => item.id !== leave.id)];
+  return res.json({ success: true, leave });
+});
+
+app.get('/api/leaves', async (_req, res) => {
+  const sb = getSupabase();
+  if (sb) {
+    const { data, error } = await sb.from('leave_requests').select('*').order('applied_at', { ascending: false });
+    if (!error && data) return res.json({ success: true, leaves: data });
+  }
+  return res.json({ success: true, leaves: inMemoryLeaveRequests });
+});
+
+app.patch('/api/leaves/:id', async (req, res) => {
+  const updates = req.body || {};
+  const dbUpdates = {
+    ...(updates.leaveType !== undefined && { leave_type: updates.leaveType }),
+    ...(updates.startDate !== undefined && { start_date: updates.startDate }),
+    ...(updates.endDate !== undefined && { end_date: updates.endDate }),
+    ...(updates.totalDays !== undefined && { total_days: updates.totalDays }),
+    ...(updates.isHalfDay !== undefined && { is_half_day: updates.isHalfDay }),
+    ...(updates.reason !== undefined && { reason: updates.reason }),
+    ...(updates.status !== undefined && { status: updates.status }),
+    ...(updates.reviewedBy !== undefined && { reviewed_by: updates.reviewedBy }),
+    ...(updates.reviewedAt !== undefined && { reviewed_at: updates.reviewedAt }),
+    ...(updates.adminComments !== undefined && { admin_comments: updates.adminComments }),
+  };
+  const sb = getSupabase();
+  if (sb) {
+    const { error } = await sb.from('leave_requests').update(dbUpdates).eq('id', req.params.id);
+    if (error) return res.status(500).json({ success: false, error: error.message });
+  }
+  inMemoryLeaveRequests = inMemoryLeaveRequests.map((leave) => leave.id === req.params.id ? { ...leave, ...updates } : leave);
+  return res.json({ success: true });
 });
 
 // Delete employee from database
