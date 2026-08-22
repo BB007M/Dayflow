@@ -1,0 +1,8 @@
+{
+  "name": "Remix Dayflow - Human Resource Management System",
+  "description": "Comprehensive Human Resource Management System (HRMS) featuring role-based access for Admin/HR Officers and Employees, attendance tracking with live check-in/out, leave requests \u0026 approval workflows, salary \u0026 payroll management with interactive payslips, and HR analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
