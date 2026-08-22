@@ -79,7 +79,7 @@ const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="app-shell min-h-screen flex flex-col text-slate-900 dark:text-slate-100 font-sans selection:bg-indigo-600 selection:text-white transition-colors duration-200">
+    <div className="app-shell console-shell min-h-screen flex flex-col text-slate-900 dark:text-slate-100 font-sans selection:bg-emerald-500 selection:text-black transition-colors duration-200">
       
       {/* Hackathon Judge Toolbar */}
       <DemoJudgeToolbar />

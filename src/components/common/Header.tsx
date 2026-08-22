@@ -102,7 +102,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 lg:px-6 py-3 transition-colors duration-200">
+    <header className="console-header sticky top-0 z-30 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 px-4 lg:px-5 py-2.5 transition-colors duration-200">
       <div className="flex items-center justify-between gap-3 max-w-7xl mx-auto">
         
         {/* Left: Mobile menu toggle + Logo / Tagline */}
@@ -119,20 +119,20 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => setActiveTab('dashboard')} 
             className="flex items-center gap-2.5 cursor-pointer group"
           >
-            <div className="w-9 h-9 rounded-md bg-black dark:bg-white flex items-center justify-center text-white dark:text-black transition-colors">
+            <div className="w-8 h-8 rounded-md bg-emerald-500 flex items-center justify-center text-black transition-colors">
               <Layers className="w-5 h-5" />
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
-                <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white font-display">
+                <span className="text-base font-semibold tracking-tight text-slate-900 dark:text-white font-display">
                   dayflow
                 </span>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60">
-                  HRMS
+                <span className="text-[10px] uppercase font-medium tracking-wider px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400">
+                  Console
                 </span>
               </div>
               <span className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:inline -mt-0.5">
-                Every workday, perfectly aligned.
+                Workforce operations
               </span>
             </div>
           </div>

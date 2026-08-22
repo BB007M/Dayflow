@@ -15,24 +15,46 @@
 
 @layer components {
   .app-shell {
-    background: #ffffff;
+    background: #f8f8f8;
   }
 
   .dark .app-shell {
-    background: #000000;
+    background-color: #0d0e0e;
+    background-image: radial-gradient(rgb(255 255 255 / 0.07) 0.75px, transparent 0.75px);
+    background-size: 18px 18px;
   }
 
   .app-workspace {
-    background: transparent;
+    background: rgb(255 255 255 / 0.48);
   }
 
   .dark .app-workspace {
-    background: transparent;
+    background: rgb(13 14 14 / 0.72);
   }
 
   /* Monochrome, high-contrast surfaces inspired by Vercel's product UI. */
   .app-shell .rounded-xl {
     border-radius: 0.375rem;
+  }
+
+  .console-header {
+    min-height: 56px;
+  }
+
+  .dark .console-header {
+    background: rgb(13 14 14 / 0.94);
+  }
+
+  .console-sidebar {
+    background: #ffffff;
+  }
+
+  .dark .console-sidebar {
+    background: #101111;
+  }
+
+  .console-sidebar button {
+    letter-spacing: -0.01em;
   }
 
   .app-shell .rounded-2xl {
@@ -91,6 +113,32 @@
   .dark .app-shell .bg-gradient-to-tr .text-white,
   .dark .app-shell .bg-gradient-to-br .text-white {
     color: #111111;
+  }
+
+  .app-shell .text-purple-600,
+  .app-shell .text-purple-700,
+  .app-shell .text-indigo-600,
+  .app-shell .text-indigo-700 {
+    color: #059669;
+  }
+
+  .dark .app-shell .text-purple-400,
+  .dark .app-shell .text-purple-300,
+  .dark .app-shell .text-indigo-400,
+  .dark .app-shell .text-indigo-300 {
+    color: #34d399;
+  }
+
+  .app-shell .border-purple-200,
+  .app-shell .border-purple-300,
+  .app-shell .border-purple-400 {
+    border-color: #a7f3d0;
+  }
+
+  .dark .app-shell .border-purple-700,
+  .dark .app-shell .border-purple-800,
+  .dark .app-shell .border-purple-900 {
+    border-color: rgb(16 185 129 / 0.35);
   }
 }
 
