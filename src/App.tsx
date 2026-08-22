@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { HRProvider, useHR } from './context/HRContext';
 import { Header } from './components/common/Header';
 import { Sidebar } from './components/common/Sidebar';
-import { DemoJudgeToolbar } from './components/common/DemoJudgeToolbar';
 import { NotificationDrawer } from './components/common/NotificationDrawer';
 import { ToastContainer } from './components/common/ToastContainer';
+import { CleanCelebrationModal } from './components/common/CleanCelebrationModal';
 import { AuthModal } from './components/auth/AuthModal';
+import { LoginPage } from './components/auth/LoginPage';
+import { AuditLogsDrawer } from './components/common/AuditLogsDrawer';
 
 import { EmployeeDashboard } from './components/dashboard/EmployeeDashboard';
 import { AdminDashboard } from './components/dashboard/AdminDashboard';
@@ -15,18 +17,52 @@ import { AddEmployeeModal } from './components/employees/AddEmployeeModal';
 import { AttendanceView } from './components/attendance/AttendanceView';
 import { LeaveManagement } from './components/leaves/LeaveManagement';
 import { PayrollView } from './components/payroll/PayrollView';
+import { SalaryIncrementView } from './components/payroll/SalaryIncrementView';
 import { AnalyticsView } from './components/analytics/AnalyticsView';
 
 const MainLayout: React.FC = () => {
-  const { activeTab, currentRole, isNotificationOpen, setIsNotificationOpen } = useHR();
+  const { activeTab, currentRole, isNotificationOpen, setIsNotificationOpen, currentUser } = useHR();
   const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // If user is not authenticated / logged out, redirect completely to the Login Page
+  if (!currentUser) {
+    return (
+      <>
+        <LoginPage />
+        <AuditLogsDrawer />
+        <ToastContainer />
+      </>
+    );
+  }
 
   // Render active view based on tab selection
   const renderActiveView = () => {
     switch (activeTab) {
+      case 'admin':
+        if (currentRole === 'admin') {
+          return <AdminDashboard isDedicatedAdminRoute={true} onOpenAddEmployee={() => setIsAddEmployeeOpen(true)} />;
+        }
+        return (
+          <div className="max-w-xl mx-auto my-12 p-8 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl text-center space-y-4">
+            <div className="w-14 h-14 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded-2xl flex items-center justify-center mx-auto text-rose-600 dark:text-rose-400">
+              <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white font-display">Administrator Access Restricted</h2>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              The <code>/admin</code> console and user provisioning portal is restricted to authorized System Administrators. You are currently logged in as a standard employee.
+            </p>
+            <div className="p-4 rounded-2xl bg-purple-50/60 dark:bg-purple-950/30 border border-purple-200/80 dark:border-purple-800/50 text-left space-y-1.5">
+              <div className="text-xs font-bold text-purple-900 dark:text-purple-300">Administrator Account Required:</div>
+              <div className="text-xs text-purple-800 dark:text-purple-300 font-mono">Email: sarveshv6413@gmail.com</div>
+              <div className="text-xs text-purple-800 dark:text-purple-300 font-mono">Password: SarvesH@07</div>
+            </div>
+          </div>
+        );
       case 'dashboard':
-        return currentRole === 'admin' ? <AdminDashboard /> : <EmployeeDashboard />;
+        return <EmployeeDashboard />;
       case 'employees':
         return <EmployeeDirectory onOpenAddEmployee={() => setIsAddEmployeeOpen(true)} />;
       case 'attendance':
@@ -35,24 +71,23 @@ const MainLayout: React.FC = () => {
         return <LeaveManagement />;
       case 'payroll':
         return <PayrollView />;
+      case 'salary-increment':
+        return <SalaryIncrementView />;
       case 'analytics':
         return <AnalyticsView />;
       default:
-        return currentRole === 'admin' ? <AdminDashboard /> : <EmployeeDashboard />;
+        return <EmployeeDashboard />;
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50/50 text-slate-900 font-sans selection:bg-purple-500 selection:text-white">
+    <div className="app-shell console-shell min-h-screen flex flex-col text-slate-900 dark:text-slate-100 font-sans selection:bg-emerald-500 selection:text-black transition-colors duration-200">
       
-      {/* Hackathon Judge Toolbar */}
-      <DemoJudgeToolbar />
-
       {/* Main Header */}
       <Header onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)} />
 
       {/* App Workspace Body */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 min-h-0 flex overflow-hidden app-frame">
         
         {/* Responsive Desktop & Mobile Sidebar */}
         <Sidebar
@@ -61,7 +96,7 @@ const MainLayout: React.FC = () => {
         />
 
         {/* Dynamic Main Workspace Content */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <main className="app-workspace min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {renderActiveView()}
         </main>
       </div>
@@ -71,6 +106,8 @@ const MainLayout: React.FC = () => {
         isOpen={isNotificationOpen}
         onClose={() => setIsNotificationOpen(false)}
       />
+
+      <AuditLogsDrawer />
 
       <EmployeeProfileModal />
 
@@ -83,6 +120,9 @@ const MainLayout: React.FC = () => {
 
       {/* Global Toast Feedback Engine */}
       <ToastContainer />
+
+      {/* Clean Celebration Popup for Leaves & Key Actions */}
+      <CleanCelebrationModal />
     </div>
   );
 };

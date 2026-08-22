@@ -1,14 +1,16 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
   Employee, 
   UserRole, 
   AttendanceRecord, 
+  AttendanceDbLog,
   LeaveRequest, 
   Payslip, 
   NotificationItem, 
   CheckInState, 
   SalaryStructure,
-  Department
+  Department,
+  CelebrationPopupData
 } from '../types';
 import { 
   INITIAL_EMPLOYEES, 
@@ -17,7 +19,7 @@ import {
   INITIAL_PAYSLIPS, 
   INITIAL_NOTIFICATIONS 
 } from '../data/initialData';
-import confetti from 'canvas-confetti';
+import { LoginAuditLog } from '../types/auth';
 
 interface ToastMessage {
   id: string;
@@ -27,10 +29,12 @@ interface ToastMessage {
 }
 
 interface HRContextType {
-  currentUser: Employee;
+  currentUser: Employee | null;
   currentRole: UserRole;
+  isAuthenticated: boolean;
   employees: Employee[];
   attendanceRecords: AttendanceRecord[];
+  attendanceDbLogs: AttendanceDbLog[];
   leaveRequests: LeaveRequest[];
   payslips: Payslip[];
   notifications: NotificationItem[];
@@ -42,16 +46,30 @@ interface HRContextType {
   isProfileModalOpen: boolean;
   isAuthModalOpen: boolean;
   authModalMode: 'signin' | 'signup';
+  isDbConnected: boolean;
+  loginAuditLogs: LoginAuditLog[];
+  isAuditDrawerOpen: boolean;
+  isNotificationOpen: boolean;
+  celebrationData: CelebrationPopupData | null;
   
   // Actions
+  triggerCelebration: (data: CelebrationPopupData) => void;
+  closeCelebration: () => void;
+  setIsNotificationOpen: (open: boolean) => void;
+  openNotificationDrawer: () => void;
+  closeNotificationDrawer: () => void;
   setActiveTab: (tab: string) => void;
   switchUser: (employeeId: string) => void;
   switchRole: (role: UserRole) => void;
   openAuthModal: (mode?: 'signin' | 'signup') => void;
   closeAuthModal: () => void;
-  signIn: (email: string, role: UserRole) => boolean;
-  signUp: (payload: { employeeId: string; email: string; firstName: string; lastName: string; role: UserRole; department: Department }) => boolean;
-  signOut: () => void;
+  signIn: (email: string, role?: UserRole, password?: string) => Promise<boolean>;
+  signUp: (payload: { employeeId: string; email: string; firstName: string; lastName: string; role: UserRole; department: Department; password?: string }) => Promise<boolean>;
+  signOut: (reason?: string) => Promise<void>;
+  openAuditDrawer: () => void;
+  closeAuditDrawer: () => void;
+  refreshAuditLogs: () => Promise<void>;
+  refreshAttendanceLogs: () => Promise<void>;
   
   // Attendance
   checkIn: () => void;
@@ -74,8 +92,11 @@ interface HRContextType {
   openEmployeeProfile: (employee: Employee) => void;
   closeEmployeeProfile: () => void;
   updateEmployee: (updated: Employee) => void;
-  addNewEmployee: (newEmployee: Omit<Employee, 'id'>) => void;
+  addNewEmployee: (newEmployee: Omit<Employee, 'id'>, initialPassword?: string) => Promise<void>;
   updateSalaryStructure: (employeeId: string, structure: SalaryStructure) => void;
+  terminateEmployee: (employeeId: string, reason?: string, notes?: string) => Promise<boolean>;
+  rehireEmployee: (employeeId: string) => Promise<boolean>;
+  deleteEmployee: (employeeId: string) => Promise<boolean>;
   
   // Payroll
   generateMonthlyPayroll: (month: string, year: number) => void;
@@ -91,36 +112,97 @@ interface HRContextType {
 const HRContext = createContext<HRContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  EMPLOYEES: 'dayflow_hrms_employees_v1',
-  ATTENDANCE: 'dayflow_hrms_attendance_v1',
-  LEAVES: 'dayflow_hrms_leaves_v1',
-  PAYSLIPS: 'dayflow_hrms_payslips_v1',
-  NOTIFICATIONS: 'dayflow_hrms_notifications_v1',
-  CURRENT_USER_ID: 'dayflow_hrms_current_user_id_v1',
-  CHECK_IN_STATE: 'dayflow_hrms_checkin_state_v1',
+  EMPLOYEES: 'dayflow_hrms_employees_v2',
+  ATTENDANCE: 'dayflow_hrms_attendance_v2',
+  LEAVES: 'dayflow_hrms_leaves_v2',
+  PAYSLIPS: 'dayflow_hrms_payslips_v2',
+  NOTIFICATIONS: 'dayflow_hrms_notifications_v2',
+  CURRENT_USER_ID: 'dayflow_hrms_current_user_id_v2',
+  AUTH_TOKEN: 'dayflow_hrms_auth_token_v2',
+  LAST_ACTIVITY: 'dayflow_hrms_last_activity_v2',
+  CHECK_IN_STATE: 'dayflow_hrms_checkin_state_v2',
 };
 
 export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  useEffect(() => {
+    document.documentElement.classList.remove('dark');
+    localStorage.removeItem('dayflow_hrms_theme_v2');
+  }, []);
+
   // State Initialization
   const [employees, setEmployees] = useState<Employee[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.EMPLOYEES);
-    return saved ? JSON.parse(saved) : INITIAL_EMPLOYEES;
+    if (saved) {
+      try {
+        const parsed: Employee[] = JSON.parse(saved);
+        const filtered = parsed.filter(
+          (e) => !['sarah.jenkins@dayflow.corp', 'alex.chen@dayflow.corp', 'marcus.vance@dayflow.corp', 'elena.rostova@dayflow.corp', 'priya.sharma@dayflow.corp', 'david.kim@dayflow.corp'].includes(e.email.toLowerCase())
+        );
+        if (filtered.length > 0) {
+          if (!filtered.some(e => e.email.toLowerCase() === 'sarveshv6413@gmail.com')) {
+            filtered.unshift(INITIAL_EMPLOYEES[0]);
+          }
+          return filtered;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return INITIAL_EMPLOYEES;
   });
 
-  const [currentUserId, setCurrentUserId] = useState<string>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
-    return saved || 'emp-1'; // Default Sarah Jenkins (Admin)
-  });
+  // Always start with an unauthenticated session. A user must explicitly sign in
+  // after launching the app; local storage is not treated as login proof.
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
 
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
     return saved ? JSON.parse(saved) : generateInitialAttendance();
   });
 
+  const [attendanceDbLogs, setAttendanceDbLogs] = useState<AttendanceDbLog[]>([]);
+
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.LEAVES);
     return saved ? JSON.parse(saved) : INITIAL_LEAVE_REQUESTS;
   });
+
+  useEffect(() => {
+    const reservedDays = new Map<string, number>();
+    let changed = false;
+    const repairedRequests = leaveRequests.map((leave) => {
+      if (leave.status !== 'Pending' || leave.leaveType === 'Unpaid') return leave;
+
+      const employee = employees.find((emp) => emp.employeeId === leave.employeeId);
+      const balance = employee
+        ? leave.leaveType === 'Paid'
+          ? employee.leaveBalance.paidLeave
+          : leave.leaveType === 'Sick'
+            ? employee.leaveBalance.sickLeave
+            : employee.leaveBalance.casualLeave
+        : null;
+      if (!balance) return leave;
+
+      const key = `${leave.employeeId}:${leave.leaveType}`;
+      const reserved = reservedDays.get(key) || 0;
+      if (reserved + leave.totalDays > balance.remaining) {
+        changed = true;
+        return {
+          ...leave,
+          status: 'Rejected' as const,
+          reviewedBy: 'Dayflow Leave Policy',
+          reviewedAt: new Date().toISOString(),
+          adminComments: `Request exceeds the available ${leave.leaveType.toLowerCase()} leave balance of ${balance.remaining} day${balance.remaining === 1 ? '' : 's'}.`,
+        };
+      }
+
+      reservedDays.set(key, reserved + leave.totalDays);
+      return leave;
+    });
+
+    if (changed) setLeaveRequests(repairedRequests);
+  }, [employees, leaveRequests]);
 
   const [payslips, setPayslips] = useState<Payslip[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.PAYSLIPS);
@@ -132,12 +214,65 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
   });
 
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const getInitialTab = () => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path === '/admin') return 'admin';
+      if (path === '/employees') return 'employees';
+      if (path === '/attendance') return 'attendance';
+      if (path === '/leaves') return 'leaves';
+      if (path === '/payroll') return 'payroll';
+      if (path === '/analytics') return 'analytics';
+    }
+    return 'dashboard';
+  };
+
+  const [activeTab, setActiveTabState] = useState<string>(getInitialTab);
+
+  const setActiveTab = (tab: string) => {
+    setActiveTabState(tab);
+    if (typeof window !== 'undefined') {
+      const targetPath = tab === 'dashboard' ? '/' : `/${tab}`;
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({ tab }, '', targetPath);
+      }
+    }
+  };
+
+  // Sync browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname;
+        if (path === '/admin') setActiveTabState('admin');
+        else if (path === '/employees') setActiveTabState('employees');
+        else if (path === '/attendance') setActiveTabState('attendance');
+        else if (path === '/leaves') setActiveTabState('leaves');
+        else if (path === '/payroll') setActiveTabState('payroll');
+        else if (path === '/analytics') setActiveTabState('analytics');
+        else setActiveTabState('dashboard');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [selectedEmployeeForModal, setSelectedEmployeeForModal] = useState<Employee | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signin');
+  const [isDbConnected, setIsDbConnected] = useState(false);
+  const [loginAuditLogs, setLoginAuditLogs] = useState<LoginAuditLog[]>([]);
+  const [isAuditDrawerOpen, setIsAuditDrawerOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [celebrationData, setCelebrationData] = useState<CelebrationPopupData | null>(null);
+
+  const openNotificationDrawer = useCallback(() => setIsNotificationOpen(true), []);
+  const closeNotificationDrawer = useCallback(() => setIsNotificationOpen(false), []);
+  const triggerCelebration = useCallback((data: CelebrationPopupData) => {
+    setCelebrationData({ ...data, id: data.id || `cel-${Date.now()}-${Math.random().toString(36).substring(2, 6)}` });
+  }, []);
+  const closeCelebration = useCallback(() => setCelebrationData(null), []);
 
   // Active check-in state
   const [checkInState, setCheckInState] = useState<CheckInState>(() => {
@@ -156,8 +291,74 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   });
 
   // Current active user
-  const currentUser = employees.find((e) => e.id === currentUserId) || employees[0];
-  const currentRole = currentUser?.role || 'admin';
+  const currentUser = currentUserId ? (employees.find((e) => e.id === currentUserId) || null) : null;
+  const currentRole: UserRole = currentUser?.role || 'admin';
+  const isAuthenticated = !!currentUser;
+
+  // Check Database connection on mount & fetch sync users
+  useEffect(() => {
+    const syncDatabaseState = async () => {
+      try {
+        const res = await fetch('/api/health');
+        if (res.ok) {
+          const data = await res.json();
+          setIsDbConnected(data.db === 'connected');
+        }
+
+        // Fetch verified employees from DB
+        const empRes = await fetch('/api/employees');
+        if (empRes.ok) {
+          const empData = await empRes.json();
+          if (empData.employees && Array.isArray(empData.employees) && empData.employees.length > 0) {
+            setEmployees(empData.employees);
+          }
+        }
+      } catch (err) {
+        console.warn('API sync error:', err);
+      }
+    };
+    syncDatabaseState();
+    refreshAuditLogs();
+    refreshAttendanceLogs();
+  }, []);
+
+  const refreshAttendanceLogs = async () => {
+    try {
+      const res = await fetch('/api/attendance/logs');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.logs && Array.isArray(data.logs)) {
+          setAttendanceDbLogs(data.logs);
+        }
+      }
+    } catch (err) {
+      console.warn('Error fetching attendance logs:', err);
+    }
+  };
+
+  const refreshAuditLogs = async () => {
+    try {
+      const res = await fetch('/api/auth/logs');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.logs && Array.isArray(data.logs)) {
+          const formatted: LoginAuditLog[] = data.logs.map((row: any) => ({
+            id: row.id,
+            userId: row.user_id,
+            email: row.email,
+            role: row.role,
+            status: row.status,
+            ipAddress: row.ip_address,
+            userAgent: row.user_agent,
+            timestamp: row.timestamp,
+          }));
+          setLoginAuditLogs(formatted);
+        }
+      }
+    } catch (err) {
+      console.warn('Error fetching login logs:', err);
+    }
+  };
 
   // Persistence effects
   useEffect(() => {
@@ -165,8 +366,20 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   }, [employees]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, currentUserId);
+    if (currentUserId) {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, currentUserId);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
+    }
   }, [currentUserId]);
+
+  useEffect(() => {
+    if (sessionToken) {
+      localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, sessionToken);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    }
+  }, [sessionToken]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(attendanceRecords));
@@ -217,12 +430,21 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Switch User
+  // Switch User (Persona Switcher)
   const switchUser = (employeeId: string) => {
     const emp = employees.find((e) => e.id === employeeId || e.employeeId === employeeId);
     if (emp) {
       setCurrentUserId(emp.id);
+      setSessionToken(`sess-${Date.now()}`);
+      localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
       addToast('info', 'Active Persona Switched', `Logged in as ${emp.firstName} ${emp.lastName} (${emp.role.toUpperCase()})`);
+      
+      // Also log switch event to DB
+      fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emp.email, role: emp.role }),
+      }).then(() => refreshAuditLogs()).catch(() => {});
     }
   };
 
@@ -230,6 +452,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     const target = employees.find((e) => e.role === role);
     if (target) {
       setCurrentUserId(target.id);
+      setSessionToken(`sess-${Date.now()}`);
       addToast('info', `Switched to ${role === 'admin' ? 'Admin / HR Officer' : 'Employee'} Role`, `Active profile: ${target.firstName} ${target.lastName}`);
     }
   };
@@ -240,113 +463,290 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   };
 
   const closeAuthModal = () => {
-    setIsAuthModalOpen(false);
+    // If user is already authenticated, allow closing
+    if (currentUser) {
+      setIsAuthModalOpen(false);
+    } else {
+      // Must be logged in
+      addToast('warning', 'Authentication Required', 'Please sign in or select a demo preset account to access Dayflow HRMS.');
+    }
   };
 
-  const signIn = (email: string, role: UserRole) => {
-    const match = employees.find((e) => e.email.toLowerCase() === email.toLowerCase());
-    if (match) {
-      setCurrentUserId(match.id);
-      setIsAuthModalOpen(false);
-      addToast('success', 'Welcome Back!', `Signed in as ${match.firstName} ${match.lastName}`);
-      return true;
-    } else {
-      // Find someone matching the role or fallback
-      const roleMatch = employees.find((e) => e.role === role);
-      if (roleMatch) {
-        setCurrentUserId(roleMatch.id);
+  const openAuditDrawer = () => {
+    refreshAuditLogs();
+    setIsAuditDrawerOpen(true);
+  };
+
+  const closeAuditDrawer = () => {
+    setIsAuditDrawerOpen(false);
+  };
+
+  // Sign In with Supabase backend authentication
+  const signIn = async (email: string, role: UserRole, password?: string): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password, role }),
+      });
+
+      const data = await res.json();
+      await refreshAuditLogs();
+
+      if (res.ok && data.success && data.user) {
+        setEmployees((prev) => {
+          const exists = prev.some((e) => e.id === data.user.id);
+          if (exists) {
+            return prev.map((e) => (e.id === data.user.id ? { ...e, ...data.user } : e));
+          }
+          return [data.user, ...prev];
+        });
+        setCurrentUserId(data.user.id);
+        setSessionToken(data.token || `sess-${Date.now()}`);
+        localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
         setIsAuthModalOpen(false);
-        addToast('success', 'Sign In Successful', `Demo account: ${roleMatch.firstName} ${roleMatch.lastName}`);
+        addToast('success', 'Verified & Signed In', `Authenticated with Supabase DB as ${data.user.firstName} ${data.user.lastName}`);
         return true;
+      } else {
+        const errorMsg = data.error || 'Account not found in the database. Please check your email or register a new account.';
+        addToast('error', 'Authentication Failed', errorMsg);
+        return false;
       }
-      addToast('error', 'Account Not Found', 'Please enter a valid company email address.');
+    } catch (err) {
+      console.warn('Network sign in error:', err);
+      addToast('error', 'Authentication Failed', 'Account could not be verified in the database.');
       return false;
     }
   };
 
-  const signUp = (payload: {
+  // Sign Up with Supabase backend
+  const signUp = async (payload: {
     employeeId: string;
     email: string;
     firstName: string;
     lastName: string;
     role: UserRole;
     department: Department;
-  }) => {
-    const newEmpId = `emp-${Date.now()}`;
-    const newEmployee: Employee = {
-      id: newEmpId,
-      employeeId: payload.employeeId.toUpperCase(),
-      firstName: payload.firstName,
-      lastName: payload.lastName,
-      email: payload.email,
-      phone: '+1 (555) 000-1122',
-      avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`,
-      role: payload.role,
-      jobDetails: {
-        designation: payload.role === 'admin' ? 'HR Specialist' : 'Associate Specialist',
-        department: payload.department,
-        dateOfJoining: new Date().toISOString().split('T')[0],
-        employmentType: 'Full-Time',
-        workLocation: 'Hybrid',
-        managerName: 'Sarah Jenkins',
-        managerId: 'EMP-1001',
-      },
-      personalDetails: {
-        dob: '1998-05-15',
-        gender: 'Prefer not to say',
-        address: '123 Enterprise Blvd',
-        city: 'San Francisco, CA',
-        country: 'United States',
-        emergencyContactName: 'Family Contact',
-        emergencyContactPhone: '+1 (555) 999-8877',
-        emergencyContactRelation: 'Guardian',
-        nationality: 'American',
-      },
-      salaryStructure: {
-        basicSalary: 6000,
-        hra: 2400,
-        conveyanceAllowance: 400,
-        medicalAllowance: 400,
-        specialAllowance: 1000,
-        providentFund: 720,
-        professionalTax: 200,
-        incomeTax: 1080,
-        currency: 'USD',
-      },
-      leaveBalance: {
-        paidLeave: { total: 18, used: 0, remaining: 18 },
-        sickLeave: { total: 10, used: 0, remaining: 10 },
-        casualLeave: { total: 6, used: 0, remaining: 6 },
-        unpaidLeave: { used: 0 },
-      },
-      documents: [
-        { id: `doc-new-1`, name: 'Employee_Onboarding_Form.pdf', type: 'PDF', uploadDate: new Date().toISOString().split('T')[0], size: '1.1 MB', status: 'Pending' }
-      ],
-      status: 'Active',
-      bankDetails: {
-        bankName: 'Dayflow Federal Credit Union',
-        accountNumberMasked: '•••• •••• •••• 1092',
-        ifscOrRouting: 'DFCU0001',
-        panOrTaxId: 'US-TAX-NEW',
-      },
+    password?: string;
+  }): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      await refreshAuditLogs();
+
+      if (res.ok && data.success) {
+        if (data.user) {
+          setEmployees((prev) => [data.user, ...prev]);
+          setCurrentUserId(data.user.id);
+        } else {
+          // Fallback create
+          const newEmpId = `emp-${Date.now()}`;
+          const newEmp: Employee = {
+            id: newEmpId,
+            employeeId: payload.employeeId.toUpperCase(),
+            firstName: payload.firstName,
+            lastName: payload.lastName,
+            email: payload.email,
+            phone: '+1 (555) 000-1122',
+            avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`,
+            role: payload.role,
+            jobDetails: {
+              designation: payload.role === 'admin' ? 'HR Specialist' : 'Associate Specialist',
+              department: payload.department,
+              dateOfJoining: new Date().toISOString().split('T')[0],
+              employmentType: 'Full-Time',
+              workLocation: 'Hybrid',
+              managerName: 'Sarah Jenkins',
+              managerId: 'EMP-1001',
+            },
+            personalDetails: {
+              dob: '1998-05-15',
+              gender: 'Prefer not to say',
+              address: '123 Enterprise Blvd',
+              city: 'San Francisco, CA',
+              country: 'United States',
+              emergencyContactName: 'Family Contact',
+              emergencyContactPhone: '+1 (555) 999-8877',
+              emergencyContactRelation: 'Guardian',
+              nationality: 'American',
+            },
+            salaryStructure: {
+              basicSalary: 6000,
+              hra: 2400,
+              conveyanceAllowance: 400,
+              medicalAllowance: 400,
+              specialAllowance: 1000,
+              providentFund: 720,
+              professionalTax: 200,
+              incomeTax: 1080,
+              currency: 'USD',
+            },
+            leaveBalance: {
+              paidLeave: { total: 18, used: 0, remaining: 18 },
+              sickLeave: { total: 10, used: 0, remaining: 10 },
+              casualLeave: { total: 6, used: 0, remaining: 6 },
+              unpaidLeave: { used: 0 },
+            },
+            documents: [],
+            status: 'Active',
+            bankDetails: {
+              bankName: 'Dayflow Federal Credit Union',
+              accountNumberMasked: '•••• •••• •••• 1092',
+              ifscOrRouting: 'DFCU0001',
+              panOrTaxId: 'US-TAX-NEW',
+            },
+          };
+          setEmployees((prev) => [newEmp, ...prev]);
+          setCurrentUserId(newEmpId);
+        }
+
+        setSessionToken(data.token || `sess-${Date.now()}`);
+        localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
+        setIsAuthModalOpen(false);
+        triggerCelebration({
+          type: 'general',
+          title: 'Account Registered & Verified!',
+          subtitle: `Welcome to Dayflow HRMS, ${payload.firstName}! Your workspace has been configured.`,
+          badge: 'Registration Complete',
+          details: [
+            { label: 'Name', value: `${payload.firstName} ${payload.lastName}` },
+            { label: 'Role Assigned', value: payload.role === 'admin' ? 'Administrator' : 'Employee' },
+            { label: 'Department', value: payload.department || 'Engineering' },
+            { label: 'Work Email', value: payload.email },
+          ],
+          employeeName: `${payload.firstName} ${payload.lastName}`,
+        });
+        addToast('success', 'Account Stored in Database', `Welcome to Dayflow HRMS, ${payload.firstName}!`);
+        return true;
+      } else {
+        addToast('error', 'Registration Failed', data.error || 'Could not register user.');
+        return false;
+      }
+    } catch (err) {
+      console.error('Signup error:', err);
+      addToast('error', 'Sign Up Error', 'Could not complete registration.');
+      return false;
+    }
+  };
+
+  // Sign Out function
+  const signOut = async (reason?: string) => {
+    const userToLog = currentUser;
+    const tokenToClear = sessionToken;
+
+    // Send logout audit log to backend DB
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: tokenToClear,
+          userId: userToLog?.id,
+          email: userToLog?.email,
+          role: userToLog?.role,
+          reason: reason || 'USER_LOGOUT',
+        }),
+      });
+      await refreshAuditLogs();
+    } catch (err) {
+      console.warn('Logout API error:', err);
+    }
+
+    // Clear active session, user, and last activity timestamp
+    setCurrentUserId(null);
+    setSessionToken(null);
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
+    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.LAST_ACTIVITY);
+
+    // Prompt user to sign in again
+    setAuthModalMode('signin');
+    setIsAuthModalOpen(true);
+    
+    if (reason === 'INACTIVITY_TIMEOUT') {
+      addToast('warning', 'Session Expired', 'You have been automatically signed out after 30 minutes of inactivity for security.');
+    } else {
+      addToast('info', 'Successfully Signed Out', 'Session terminated. Database audit log recorded.');
+    }
+  };
+
+  // Security: Automatic Sign Out after 30 minutes of inactivity
+  useEffect(() => {
+    if (!isAuthenticated || !currentUserId) return;
+
+    const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+    const CHECK_INTERVAL_MS = 10 * 1000; // Check every 10 seconds
+
+    // Ensure last activity is initialized
+    const saved = localStorage.getItem(STORAGE_KEYS.LAST_ACTIVITY);
+    if (!saved) {
+      localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
+    }
+
+    let lastUpdate = Date.now();
+    const handleUserActivity = () => {
+      const now = Date.now();
+      // Throttle updating storage to at most once every 2 seconds
+      if (now - lastUpdate > 2000) {
+        lastUpdate = now;
+        localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, now.toString());
+      }
     };
 
-    setEmployees((prev) => [newEmployee, ...prev]);
-    setCurrentUserId(newEmpId);
-    setIsAuthModalOpen(false);
-    confetti({ particleCount: 60, spread: 50, origin: { y: 0.6 } });
-    addToast('success', 'Account Registered Successfully', `Welcome to Dayflow HRMS, ${payload.firstName}!`);
-    return true;
-  };
+    // User interaction events that reset the activity timer
+    const activityEvents: (keyof WindowEventMap)[] = [
+      'mousedown',
+      'mousemove',
+      'keydown',
+      'scroll',
+      'touchstart',
+      'click'
+    ];
 
-  const signOut = () => {
-    // Switch to first employee or open sign in
-    addToast('info', 'Logged Out', 'You have been signed out of Dayflow HRMS.');
-    openAuthModal('signin');
-  };
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, handleUserActivity, { passive: true });
+    });
+
+    // Periodic check for inactivity expiration
+    const intervalId = setInterval(() => {
+      const storedLastActivity = localStorage.getItem(STORAGE_KEYS.LAST_ACTIVITY);
+      const lastActivityTime = storedLastActivity ? parseInt(storedLastActivity, 10) : lastUpdate;
+      const elapsed = Date.now() - lastActivityTime;
+
+      if (elapsed >= INACTIVITY_TIMEOUT_MS) {
+        signOut('INACTIVITY_TIMEOUT');
+      }
+    }, CHECK_INTERVAL_MS);
+
+    // Also check on tab visibility regain (e.g. user returns after being away)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const storedLastActivity = localStorage.getItem(STORAGE_KEYS.LAST_ACTIVITY);
+        const lastActivityTime = storedLastActivity ? parseInt(storedLastActivity, 10) : lastUpdate;
+        if (Date.now() - lastActivityTime >= INACTIVITY_TIMEOUT_MS) {
+          signOut('INACTIVITY_TIMEOUT');
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, handleUserActivity);
+      });
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(intervalId);
+    };
+  }, [isAuthenticated, currentUserId]);
 
   // Attendance Actions
   const checkIn = () => {
+    if (!currentUser) return;
     const now = new Date();
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
     const todayStr = now.toISOString().split('T')[0];
@@ -360,7 +760,6 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       accumulatedBreakSeconds: 0,
     });
 
-    // Update today's record in attendanceRecords
     setAttendanceRecords((prev) => {
       const existingIndex = prev.findIndex((r) => r.employeeId === currentUser.employeeId && r.date === todayStr);
       if (existingIndex >= 0) {
@@ -388,10 +787,26 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       }
     });
 
+    // Write real-time attendance telemetry to Supabase DB
+    fetch('/api/attendance/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        employeeId: currentUser.employeeId,
+        employeeName: `${currentUser.firstName} ${currentUser.lastName}`,
+        email: currentUser.email,
+        date: todayStr,
+        actionType: 'CHECK_IN',
+        checkInTime: timeStr,
+        status: 'present',
+      }),
+    }).then(() => refreshAttendanceLogs()).catch(() => {});
+
     addToast('success', 'Checked In Successfully', `Good day, ${currentUser.firstName}! Punch recorded at ${timeStr}`);
   };
 
   const checkOut = () => {
+    if (!currentUser) return;
     const now = new Date();
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
     const todayStr = now.toISOString().split('T')[0];
@@ -419,24 +834,41 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       return prev;
     });
 
+    // Write punch out telemetry to Supabase DB
+    fetch('/api/attendance/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        employeeId: currentUser.employeeId,
+        employeeName: `${currentUser.firstName} ${currentUser.lastName}`,
+        email: currentUser.email,
+        date: todayStr,
+        actionType: 'CHECK_OUT',
+        checkInTime: checkInState.checkInTimestamp,
+        checkOutTime: timeStr,
+        totalHoursWorked: Math.max(hoursWorked, 0.1),
+        breakMinutes: breakMins,
+        status: 'present',
+      }),
+    }).then(() => refreshAttendanceLogs()).catch(() => {});
+
     addToast('info', 'Checked Out Successfully', `Punch out recorded at ${timeStr}. Total time: ${hoursWorked} hrs`);
   };
 
   const toggleBreak = () => {
     const now = new Date();
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    const todayStr = now.toISOString().split('T')[0];
+    const nextBreak = !checkInState.isOnBreak;
     
     setCheckInState((prev) => {
-      const nextBreak = !prev.isOnBreak;
       if (nextBreak) {
-        addToast('info', 'Break Started', `Enjoy your break! Started at ${timeStr}`);
         return {
           ...prev,
           isOnBreak: true,
           breakStartTimestamp: timeStr,
         };
       } else {
-        addToast('success', 'Back from Break', `Welcome back! Resumed work at ${timeStr}`);
         return {
           ...prev,
           isOnBreak: false,
@@ -444,18 +876,74 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         };
       }
     });
+
+    if (nextBreak) {
+      addToast('info', 'Break Started', `Enjoy your break! Started at ${timeStr}`);
+    } else {
+      addToast('success', 'Back from Break', `Welcome back! Resumed work at ${timeStr}`);
+    }
+
+    // Write break telemetry to Supabase DB
+    if (currentUser) {
+      fetch('/api/attendance/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: currentUser.employeeId,
+          employeeName: `${currentUser.firstName} ${currentUser.lastName}`,
+          email: currentUser.email,
+          date: todayStr,
+          actionType: nextBreak ? 'BREAK_START' : 'BREAK_END',
+          checkInTime: checkInState.checkInTimestamp,
+          breakMinutes: Math.round(checkInState.accumulatedBreakSeconds / 60),
+          status: nextBreak ? 'on_break' : 'present',
+        }),
+      }).then(() => refreshAttendanceLogs()).catch(() => {});
+    }
   };
 
   const markAttendanceManual = (record: AttendanceRecord) => {
+    const regularizer = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'HR Administrator';
     setAttendanceRecords((prev) => {
       const idx = prev.findIndex((r) => r.id === record.id || (r.employeeId === record.employeeId && r.date === record.date));
       if (idx >= 0) {
         const updated = [...prev];
-        updated[idx] = { ...record, isManual: true, regularizedBy: currentUser.firstName + ' ' + currentUser.lastName };
+        updated[idx] = { ...record, isManual: true, regularizedBy: regularizer };
         return updated;
       }
-      return [{ ...record, isManual: true, regularizedBy: currentUser.firstName + ' ' + currentUser.lastName }, ...prev];
+      return [{ ...record, isManual: true, regularizedBy: regularizer }, ...prev];
     });
+
+    // Send manual regularization to Supabase DB
+    fetch('/api/attendance/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        employeeId: record.employeeId,
+        date: record.date,
+        actionType: 'MANUAL_PUNCH',
+        checkInTime: record.checkInTime,
+        checkOutTime: record.checkOutTime,
+        totalHoursWorked: record.totalHoursWorked,
+        breakMinutes: record.breakMinutes,
+        status: record.status,
+      }),
+    }).then(() => refreshAttendanceLogs()).catch(() => {});
+
+    // Notify employee of attendance regularization
+    const attNotif: NotificationItem = {
+      id: `notif-att-${Date.now()}`,
+      title: 'Attendance Regularization',
+      message: `Your punch record for ${record.date} was regularized by ${regularizer}.`,
+      timestamp: 'Just now',
+      isRead: false,
+      type: 'attendance',
+      targetRole: 'employee',
+      targetEmployeeId: record.employeeId,
+      linkTab: 'attendance',
+    };
+    setNotifications((prev) => [attNotif, ...prev]);
+
     addToast('success', 'Attendance Record Updated', `Successfully regularized attendance for ${record.employeeId} on ${record.date}`);
   };
 
@@ -468,6 +956,29 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     isHalfDay: boolean;
     reason: string;
   }) => {
+    if (!currentUser) return;
+
+    const balance = data.leaveType === 'Paid'
+      ? currentUser.leaveBalance.paidLeave
+      : data.leaveType === 'Sick'
+        ? currentUser.leaveBalance.sickLeave
+        : data.leaveType === 'Casual'
+          ? currentUser.leaveBalance.casualLeave
+          : null;
+    const pendingDays = leaveRequests
+      .filter((leave) => leave.employeeId === currentUser.employeeId && leave.leaveType === data.leaveType && leave.status === 'Pending')
+      .reduce((total, leave) => total + leave.totalDays, 0);
+
+    if (balance && data.totalDays + pendingDays > balance.remaining) {
+      const availableDays = Math.max(0, balance.remaining - pendingDays);
+      addToast(
+        'warning',
+        'Insufficient Leave Balance',
+        `You can request ${availableDays} more ${data.leaveType.toLowerCase()} leave day${availableDays === 1 ? '' : 's'}.`
+      );
+      return;
+    }
+
     const newLeave: LeaveRequest = {
       id: `leave-${Date.now()}`,
       employeeId: currentUser.employeeId,
@@ -499,13 +1010,48 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     };
     setNotifications((prev) => [newNotif, ...prev]);
 
-    confetti({ particleCount: 40, spread: 40, origin: { y: 0.7 } });
+    triggerCelebration({
+      type: 'leave_applied',
+      title: 'Leave Application Submitted!',
+      subtitle: `Your ${data.leaveType} leave request has been submitted to HR for approval.`,
+      badge: 'Application Sent',
+      details: [
+        { label: 'Leave Category', value: `${data.leaveType} Leave` },
+        { label: 'Duration', value: `${data.totalDays} day${data.totalDays > 1 ? 's' : ''}${data.isHalfDay ? ' (Half Day)' : ''}` },
+        { label: 'Start Date', value: data.startDate },
+        { label: 'End Date', value: data.endDate },
+      ],
+      employeeName: `${currentUser.firstName} ${currentUser.lastName}`,
+      employeeAvatar: currentUser.avatar,
+    });
+
     addToast('success', 'Leave Request Submitted', `Your ${data.leaveType} leave request for ${data.totalDays} day(s) has been sent to HR for approval.`);
   };
 
   const reviewLeave = (leaveId: string, status: 'Approved' | 'Rejected', comments?: string) => {
     const targetLeave = leaveRequests.find((l) => l.id === leaveId);
-    if (!targetLeave) return;
+    if (!targetLeave || targetLeave.status !== 'Pending') return;
+    const reviewer = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'HR Director';
+
+    if (status === 'Approved' && targetLeave.leaveType !== 'Unpaid') {
+      const employee = employees.find((emp) => emp.employeeId === targetLeave.employeeId);
+      const balance = employee
+        ? targetLeave.leaveType === 'Paid'
+          ? employee.leaveBalance.paidLeave
+          : targetLeave.leaveType === 'Sick'
+            ? employee.leaveBalance.sickLeave
+            : employee.leaveBalance.casualLeave
+        : null;
+
+      if (!balance || targetLeave.totalDays > balance.remaining) {
+        addToast(
+          'warning',
+          'Leave Approval Blocked',
+          `${targetLeave.employeeName} has only ${balance?.remaining || 0} ${targetLeave.leaveType.toLowerCase()} leave day${balance?.remaining === 1 ? '' : 's'} remaining.`
+        );
+        return;
+      }
+    }
 
     setLeaveRequests((prev) =>
       prev.map((l) => {
@@ -513,7 +1059,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
           return {
             ...l,
             status,
-            reviewedBy: `${currentUser.firstName} ${currentUser.lastName}`,
+            reviewedBy: reviewer,
             reviewedAt: new Date().toISOString(),
             adminComments: comments || (status === 'Approved' ? 'Leave approved by HR.' : 'Request could not be accommodated at this time.'),
           };
@@ -527,7 +1073,12 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       setEmployees((prev) =>
         prev.map((emp) => {
           if (emp.employeeId === targetLeave.employeeId) {
-            const currentBal = { ...emp.leaveBalance };
+            const currentBal = {
+              paidLeave: { ...emp.leaveBalance.paidLeave },
+              sickLeave: { ...emp.leaveBalance.sickLeave },
+              casualLeave: { ...emp.leaveBalance.casualLeave },
+              unpaidLeave: { ...emp.leaveBalance.unpaidLeave },
+            };
             if (targetLeave.leaveType === 'Paid') {
               currentBal.paidLeave.used += targetLeave.totalDays;
               currentBal.paidLeave.remaining = Math.max(0, currentBal.paidLeave.total - currentBal.paidLeave.used);
@@ -581,7 +1132,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
       title: `Leave Request ${status}`,
-      message: `Your ${targetLeave.leaveType} leave request (${targetLeave.startDate} to ${targetLeave.endDate}) was ${status.toLowerCase()} by ${currentUser.firstName} ${currentUser.lastName}.`,
+      message: `Your ${targetLeave.leaveType} leave request (${targetLeave.startDate} to ${targetLeave.endDate}) was ${status.toLowerCase()} by ${reviewer}.`,
       timestamp: 'Just now',
       isRead: false,
       type: 'leave',
@@ -592,7 +1143,20 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     setNotifications((prev) => [newNotif, ...prev]);
 
     if (status === 'Approved') {
-      confetti({ particleCount: 50, spread: 60 });
+      triggerCelebration({
+        type: 'leave_approved',
+        title: 'Leave Approved Successfully!',
+        subtitle: `Approved ${targetLeave.totalDays} day(s) of ${targetLeave.leaveType} leave for ${targetLeave.employeeName}.`,
+        badge: 'HR Verified & Approved',
+        details: [
+          { label: 'Employee', value: targetLeave.employeeName },
+          { label: 'Leave Category', value: `${targetLeave.leaveType} Leave` },
+          { label: 'Total Duration', value: `${targetLeave.totalDays} day${targetLeave.totalDays > 1 ? 's' : ''}` },
+          { label: 'Calendar Updated', value: `${targetLeave.startDate} → ${targetLeave.endDate}` },
+        ],
+        employeeName: targetLeave.employeeName,
+        employeeAvatar: targetLeave.employeeAvatar,
+      });
     }
 
     addToast(
@@ -618,30 +1182,203 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     if (selectedEmployeeForModal?.id === updated.id) {
       setSelectedEmployeeForModal(updated);
     }
-    addToast('success', 'Profile Updated', `Changes to ${updated.firstName} ${updated.lastName}'s profile have been saved.`);
+
+    // Persist to Supabase database
+    fetch(`/api/employees/${updated.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    }).catch((err) => console.warn('Supabase profile update sync error:', err));
+
+    addToast('success', 'Profile Updated & Synced', `Changes to ${updated.firstName} ${updated.lastName}'s profile saved in Supabase.`);
   };
 
-  const addNewEmployee = (newEmployeeData: Omit<Employee, 'id'>) => {
+  const addNewEmployee = async (newEmployeeData: Omit<Employee, 'id'>, initialPassword?: string) => {
     const newId = `emp-${Date.now()}`;
     const completeEmp: Employee = {
       ...newEmployeeData,
       id: newId,
     };
     setEmployees((prev) => [completeEmp, ...prev]);
-    confetti({ particleCount: 70, spread: 70 });
-    addToast('success', 'Employee Onboarded', `${completeEmp.firstName} ${completeEmp.lastName} (${completeEmp.employeeId}) has been added to the system.`);
+
+    // Also persist user credentials and full details to backend / Supabase
+    try {
+      await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: completeEmp.id,
+          employeeId: completeEmp.employeeId,
+          email: completeEmp.email,
+          firstName: completeEmp.firstName,
+          lastName: completeEmp.lastName,
+          role: completeEmp.role,
+          department: completeEmp.jobDetails.department,
+          password: initialPassword || 'EmployeePass2026!',
+          phone: completeEmp.phone,
+          avatar: completeEmp.avatar,
+          status: completeEmp.status,
+          jobDetails: completeEmp.jobDetails,
+          personalDetails: completeEmp.personalDetails,
+          salaryStructure: completeEmp.salaryStructure,
+          leaveBalance: completeEmp.leaveBalance,
+          bankDetails: completeEmp.bankDetails,
+          documents: completeEmp.documents,
+        }),
+      });
+    } catch (err) {
+      console.warn('Backend sync failed:', err);
+    }
+
+    triggerCelebration({
+      type: 'employee_onboarded',
+      title: 'Employee Onboarded & Provisioned!',
+      subtitle: `${completeEmp.firstName} ${completeEmp.lastName} has been added and assigned credentials.`,
+      badge: 'Account Created',
+      details: [
+        { label: 'Employee ID', value: completeEmp.employeeId },
+        { label: 'Department', value: completeEmp.jobDetails.department },
+        { label: 'Role Access', value: completeEmp.role === 'admin' ? 'Administrator' : 'Employee' },
+        { label: 'Work Email', value: completeEmp.email },
+      ],
+      employeeName: `${completeEmp.firstName} ${completeEmp.lastName}`,
+      employeeAvatar: completeEmp.avatar,
+    });
+
+    addToast('success', 'User Provisioned & Onboarded', `${completeEmp.firstName} ${completeEmp.lastName} (${completeEmp.employeeId}) has been created with login access.`);
   };
 
   const updateSalaryStructure = (employeeId: string, structure: SalaryStructure) => {
+    let targetEmp: Employee | undefined;
     setEmployees((prev) =>
       prev.map((emp) => {
         if (emp.employeeId === employeeId || emp.id === employeeId) {
-          return { ...emp, salaryStructure: structure };
+          targetEmp = { ...emp, salaryStructure: structure };
+          return targetEmp;
         }
         return emp;
       })
     );
-    addToast('success', 'Salary Structure Updated', `Compensation package updated for ${employeeId}.`);
+
+    if (targetEmp) {
+      fetch(`/api/employees/${(targetEmp as Employee).id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ salaryStructure: structure }),
+      }).catch((err) => console.warn('Supabase salary update sync error:', err));
+    }
+
+    addToast('success', 'Salary Structure Updated', `Compensation package updated and synced for ${employeeId}.`);
+  };
+
+  const terminateEmployee = async (employeeId: string, reason?: string, notes?: string): Promise<boolean> => {
+    const target = employees.find((e) => e.id === employeeId || e.employeeId === employeeId);
+    if (!target) {
+      addToast('error', 'Employee Not Found', `Could not find employee with ID: ${employeeId}`);
+      return false;
+    }
+
+    const terminationReason = reason || 'Employment terminated by HR Administration';
+
+    // Update in React State
+    setEmployees((prev) =>
+      prev.map((emp) => {
+        if (emp.id === target.id || emp.employeeId === target.employeeId) {
+          return { ...emp, status: 'Terminated' };
+        }
+        return emp;
+      })
+    );
+
+    if (selectedEmployeeForModal?.id === target.id || selectedEmployeeForModal?.employeeId === target.employeeId) {
+      setSelectedEmployeeForModal((prev) => (prev ? { ...prev, status: 'Terminated' } : null));
+    }
+
+    // Call Supabase Database API
+    try {
+      await fetch(`/api/employees/${target.id}/terminate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reason: terminationReason,
+          notes,
+          severedBy: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'HR Administrator',
+          terminationDate: new Date().toISOString().split('T')[0],
+        }),
+      });
+    } catch (err) {
+      console.warn('Termination API sync notice:', err);
+    }
+
+    // Refresh audit telemetry in drawer
+    refreshAuditLogs().catch(() => {});
+
+    // Notification
+    const notif: NotificationItem = {
+      id: `notif-term-${Date.now()}`,
+      title: 'Employee Terminated',
+      message: `${target.firstName} ${target.lastName} (${target.employeeId}) has been marked as Terminated in the database. Reason: ${terminationReason}`,
+      timestamp: 'Just now',
+      isRead: false,
+      type: 'system',
+      targetRole: 'admin',
+      linkTab: 'employees',
+    };
+    setNotifications((prev) => [notif, ...prev]);
+
+    addToast('error', 'Employee Terminated', `${target.firstName} ${target.lastName} (${target.employeeId}) is now Terminated. Database updated.`);
+    return true;
+  };
+
+  const rehireEmployee = async (employeeId: string): Promise<boolean> => {
+    const target = employees.find((e) => e.id === employeeId || e.employeeId === employeeId);
+    if (!target) return false;
+
+    setEmployees((prev) =>
+      prev.map((emp) => {
+        if (emp.id === target.id || emp.employeeId === target.employeeId) {
+          return { ...emp, status: 'Active' };
+        }
+        return emp;
+      })
+    );
+
+    if (selectedEmployeeForModal?.id === target.id || selectedEmployeeForModal?.employeeId === target.employeeId) {
+      setSelectedEmployeeForModal((prev) => (prev ? { ...prev, status: 'Active' } : null));
+    }
+
+    try {
+      await fetch(`/api/employees/${target.id}/rehire`, {
+        method: 'POST',
+      });
+    } catch (err) {
+      console.warn('Rehire API sync error:', err);
+    }
+
+    refreshAuditLogs().catch(() => {});
+    addToast('success', 'Employee Reactivated', `${target.firstName} ${target.lastName} status restored to Active in Supabase.`);
+    return true;
+  };
+
+  const deleteEmployee = async (employeeId: string): Promise<boolean> => {
+    const target = employees.find((e) => e.id === employeeId || e.employeeId === employeeId);
+    if (!target) return false;
+
+    setEmployees((prev) => prev.filter((e) => e.id !== target.id && e.employeeId !== target.employeeId));
+    if (selectedEmployeeForModal?.id === target.id || selectedEmployeeForModal?.employeeId === target.employeeId) {
+      closeEmployeeProfile();
+    }
+
+    try {
+      await fetch(`/api/employees/${target.id}`, {
+        method: 'DELETE',
+      });
+    } catch (err) {
+      console.warn('Delete API sync error:', err);
+    }
+
+    addToast('info', 'Record Removed', `${target.firstName} ${target.lastName} deleted from database.`);
+    return true;
   };
 
   const generateMonthlyPayroll = (month: string, year: number) => {
@@ -683,24 +1420,48 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     });
 
     setPayslips((prev) => {
-      // replace existing for this month or append
       const filtered = prev.filter((p) => !(p.month === month && p.year === year));
       return [...newSlips, ...filtered];
     });
 
     const notif: NotificationItem = {
-      id: `notif-${Date.now()}`,
+      id: `notif-admin-pay-${Date.now()}`,
       title: `${month} ${year} Payroll Executed`,
       message: `Salary distribution slips generated and credited for ${employees.length} employees.`,
       timestamp: 'Just now',
       isRead: false,
       type: 'payroll',
-      targetRole: 'all',
+      targetRole: 'admin',
       linkTab: 'payroll',
     };
-    setNotifications((prev) => [notif, ...prev]);
 
-    confetti({ particleCount: 70, spread: 80 });
+    // Send individual notifications to each employee for their specific salary payslip
+    const employeePayslipNotifs: NotificationItem[] = newSlips.map((slip) => ({
+      id: `notif-slip-${slip.employeeId}-${Date.now()}`,
+      title: `${month} ${year} Payslip Disbursed`,
+      message: `Your ${month} ${year} salary statement is ready. Net Pay: $${slip.netPay.toLocaleString()} credited.`,
+      timestamp: 'Just now',
+      isRead: false,
+      type: 'payroll',
+      targetRole: 'employee',
+      targetEmployeeId: slip.employeeId,
+      linkTab: 'payroll',
+    }));
+
+    setNotifications((prev) => [notif, ...employeePayslipNotifs, ...prev]);
+
+    triggerCelebration({
+      type: 'payroll_disbursed',
+      title: `${month} ${year} Payroll Executed!`,
+      subtitle: `Successfully processed salary statements and bank disbursements for all ${employees.length} employees.`,
+      badge: 'Payroll Disbursed',
+      details: [
+        { label: 'Billing Period', value: `${month} ${year}` },
+        { label: 'Employees Paid', value: `${employees.length} Staff` },
+        { label: 'Total Payslips', value: `${newSlips.length} Statements` },
+        { label: 'Disbursement Status', value: 'Direct Deposit Sent' },
+      ],
+    });
     addToast('success', 'Payroll Batch Processed', `Generated ${newSlips.length} payslips for ${month} ${year}.`);
   };
 
@@ -715,7 +1476,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
   const resetDemoData = () => {
     setEmployees(INITIAL_EMPLOYEES);
-    setCurrentUserId('emp-1');
+    setCurrentUserId('emp-sarvesh');
     setAttendanceRecords(generateInitialAttendance());
     setLeaveRequests(INITIAL_LEAVE_REQUESTS);
     setPayslips(INITIAL_PAYSLIPS);
@@ -729,15 +1490,14 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       accumulatedBreakSeconds: 0,
     });
     localStorage.clear();
-    addToast('info', 'Demo Reset', 'Application state has been restored to default hackathon scenario.');
+    addToast('info', 'Demo Reset', 'Application state has been restored to default Sarvesh V scenario.');
   };
 
   const unreadNotificationCount = notifications.filter((n) => {
     if (n.isRead) return false;
-    if (n.targetRole === 'all') return true;
-    if (n.targetRole === currentRole) return true;
-    if (n.targetEmployeeId && n.targetEmployeeId === currentUser.employeeId) return true;
-    return false;
+    if (!currentUser) return false;
+    if (currentRole === 'admin') return true;
+    return n.targetEmployeeId === currentUser.employeeId;
   }).length;
 
   return (
@@ -745,8 +1505,10 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       value={{
         currentUser,
         currentRole,
+        isAuthenticated,
         employees,
         attendanceRecords,
+        attendanceDbLogs,
         leaveRequests,
         payslips,
         notifications,
@@ -758,6 +1520,16 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         isProfileModalOpen,
         isAuthModalOpen,
         authModalMode,
+        isDbConnected,
+        loginAuditLogs,
+        isAuditDrawerOpen,
+        isNotificationOpen,
+        celebrationData,
+        triggerCelebration,
+        closeCelebration,
+        setIsNotificationOpen,
+        openNotificationDrawer,
+        closeNotificationDrawer,
         setActiveTab,
         switchUser,
         switchRole,
@@ -766,6 +1538,10 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         signIn,
         signUp,
         signOut,
+        openAuditDrawer,
+        closeAuditDrawer,
+        refreshAuditLogs,
+        refreshAttendanceLogs,
         checkIn,
         checkOut,
         toggleBreak,
@@ -777,6 +1553,9 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         updateEmployee,
         addNewEmployee,
         updateSalaryStructure,
+        terminateEmployee,
+        rehireEmployee,
+        deleteEmployee,
         generateMonthlyPayroll,
         markNotificationRead,
         markAllNotificationsRead,

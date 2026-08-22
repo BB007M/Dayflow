@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useHR } from '../../context/HRContext';
 import { 
   LayoutDashboard, 
@@ -14,16 +14,29 @@ import {
   ChevronRight,
   ShieldCheck,
   Building2,
-  FileCheck
+  FileCheck,
+  Percent
 } from 'lucide-react';
 
 interface SidebarProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onOpenAssistant: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  isOpenMobile?: boolean;
+  onCloseMobile?: () => void;
+  onOpenAssistant?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onOpenAssistant }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ 
+  isOpen, 
+  onClose, 
+  isOpenMobile, 
+  onCloseMobile, 
+  onOpenAssistant 
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const isMobileOpen = isOpenMobile !== undefined ? isOpenMobile : (isOpen || false);
+  const handleClose = onCloseMobile || onClose || (() => {});
+
   const { 
     activeTab, 
     setActiveTab, 
@@ -32,12 +45,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onOpenAssista
     leaveRequests,
     switchRole,
     openEmployeeProfile,
+    openAuthModal,
     signOut
   } = useHR();
 
   const pendingLeavesCount = leaveRequests.filter((l) => l.status === 'Pending').length;
 
   const navItems = [
+    {
+      id: 'admin',
+      label: 'Admin Console',
+      icon: ShieldCheck,
+      roles: ['admin'],
+      adminOnlyBadge: true,
+    },
     {
       id: 'dashboard',
       label: 'Dashboard',
@@ -70,6 +91,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onOpenAssista
       roles: ['admin', 'employee'],
     },
     {
+      id: 'salary-increment',
+      label: 'Salary Increment',
+      icon: Percent,
+      roles: ['admin'],
+    },
+    {
       id: 'analytics',
       label: 'Reports & Analytics',
       icon: BarChart3,
@@ -77,72 +104,81 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onOpenAssista
     },
   ];
 
+  const visibleNavItems = navItems.filter((item) => item.roles.includes(currentRole));
+
   const handleNavClick = (tabId: string) => {
     setActiveTab(tabId);
     if (window.innerWidth < 1024) {
-      onClose();
+      handleClose();
     }
   };
 
   return (
     <>
       {/* Mobile Backdrop */}
-      {isOpen && (
+      {isMobileOpen && (
         <div
-          onClick={onClose}
+          onClick={handleClose}
           className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden transition-opacity"
         />
       )}
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-40 w-64 bg-slate-900 text-slate-100 flex flex-col border-r border-slate-800 transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`console-sidebar fixed top-0 bottom-0 left-0 z-40 w-64 h-full shrink-0 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col overflow-hidden border-r border-slate-200 dark:border-slate-800 transition-[transform,width] duration-200 ease-in-out ${isExpanded ? 'lg:w-64' : 'lg:w-16'} lg:translate-x-0 ${
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:static lg:z-10`}
       >
         {/* Brand Header */}
-        <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+        <div className={`p-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between ${isExpanded ? 'lg:justify-between' : 'lg:justify-center'}`}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-500 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-purple-600/30">
+            <button
+              type="button"
+              onClick={() => setIsExpanded((expanded) => !expanded)}
+              className="w-8 h-8 rounded-md bg-emerald-500 hover:bg-emerald-400 flex items-center justify-center text-black transition-colors"
+              aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+              title={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+            >
               <Building2 className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="font-bold text-lg font-display tracking-tight text-white flex items-center gap-1.5">
+            </button>
+            <div className={isExpanded ? '' : 'lg:hidden'}>
+              <div className="font-bold text-lg font-display tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
                 dayflow
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                  Odoo
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30">
+                  HRMS
                 </span>
               </div>
-              <div className="text-[11px] text-slate-400 font-medium">HR Operations Suite</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">HR Operations Suite</div>
             </div>
           </div>
         </div>
 
         {/* Navigation List */}
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-          <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="flex-1 overflow-hidden px-2 py-3 space-y-0.5">
+          <div className={`px-3 py-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider ${isExpanded ? '' : 'lg:hidden'}`}>
             Main Operations
           </div>
 
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all group ${
+                title={item.label}
+                className={`relative w-full flex items-center justify-between px-3.5 py-2 rounded-md font-medium text-xs sm:text-sm transition-all group ${isExpanded ? '' : 'lg:justify-center lg:px-0'} ${
                   isActive
-                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-900/30 font-semibold'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                    ? 'bg-slate-900 text-white shadow-sm font-semibold'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-purple-300'}`} />
-                  <span>{item.label}</span>
+                <div className={`flex items-center gap-3 ${isExpanded ? '' : 'lg:gap-0'}`}>
+                  <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-white dark:text-black' : 'text-slate-500 dark:text-slate-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-400'}`} />
+                  <span className={isExpanded ? '' : 'lg:hidden'}>{item.label}</span>
                 </div>
                 {item.badge !== undefined && (
-                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-500 text-white animate-pulse">
+                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-500 text-white animate-pulse ${isExpanded ? '' : 'lg:absolute lg:translate-x-3 lg:-translate-y-3'}`}>
                     {item.badge}
                   </span>
                 )}
@@ -150,78 +186,52 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onOpenAssista
             );
           })}
 
-          {/* AI HR Copilot Entry */}
-          <div className="pt-3">
-            <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-              Intelligent Tools
-            </div>
-            <button
-              onClick={() => {
-                onOpenAssistant();
-                if (window.innerWidth < 1024) onClose();
-              }}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-purple-200 bg-purple-950/40 hover:bg-purple-900/50 border border-purple-800/40 transition-all group"
-            >
-              <div className="flex items-center gap-3">
-                <Sparkles className="w-4 h-4 text-purple-400 group-hover:rotate-12 transition-transform" />
-                <span>Dayflow AI Copilot</span>
-              </div>
-              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">
-                Gemini
-              </span>
-            </button>
-          </div>
         </div>
 
-        {/* Current User & Role Switcher Footer */}
-        <div className="p-3 border-t border-slate-800 bg-slate-950/60 space-y-2">
+        {/* Current User & Logout Footer */}
+        <div className="p-2 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-black space-y-1 lg:p-2">
           {/* Active User Card */}
-          <div 
-            onClick={() => openEmployeeProfile(currentUser)}
-            className="flex items-center gap-3 p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 cursor-pointer border border-slate-800 transition-colors"
-          >
-            <img
-              src={currentUser.avatar}
-              alt={currentUser.firstName}
-              className="w-9 h-9 rounded-lg object-cover ring-1 ring-purple-500/40"
-            />
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-semibold text-white truncate">
-                {currentUser.firstName} {currentUser.lastName}
+          {currentUser ? (
+            <>
+              <div 
+                onClick={() => openEmployeeProfile(currentUser)}
+                className={`flex items-center gap-3 p-2 rounded-md bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer border border-slate-200 dark:border-slate-800 transition-colors ${isExpanded ? '' : 'lg:justify-center'}`}
+                title="View Profile Details"
+              >
+                <img
+                  src={currentUser.avatar}
+                  alt={currentUser.firstName}
+                  className="w-9 h-9 rounded-lg object-cover ring-1 ring-purple-500/40"
+                />
+                <div className={`flex-1 min-w-0 ${isExpanded ? '' : 'lg:hidden'}`}>
+                  <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">
+                    {currentUser.firstName} {currentUser.lastName}
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                    {currentRole === 'admin' ? 'HR Officer (Admin)' : currentUser.jobDetails.designation}
+                  </div>
+                </div>
+                <UserCircle className={`w-4 h-4 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-300 ${isExpanded ? '' : 'lg:hidden'}`} />
               </div>
-              <div className="text-[11px] text-slate-400 truncate">
-                {currentRole === 'admin' ? 'HR Officer (Admin)' : currentUser.jobDetails.designation}
-              </div>
-            </div>
-            <UserCircle className="w-4 h-4 text-slate-400 hover:text-purple-300" />
-          </div>
 
-          {/* Quick Role Toggle Bar */}
-          <div className="flex items-center justify-between text-xs bg-slate-900 p-1.5 rounded-lg border border-slate-800">
-            <span className="text-[11px] text-slate-400 pl-1 font-medium">Role:</span>
-            <div className="flex gap-1">
+              {/* Logout Button */}
               <button
-                onClick={() => switchRole('admin')}
-                className={`px-2 py-1 rounded text-[11px] font-semibold transition-all ${
-                  currentRole === 'admin'
-                    ? 'bg-purple-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white'
-                }`}
+                onClick={() => signOut()}
+                className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-md bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800/50 text-xs font-semibold text-rose-700 dark:text-rose-300 hover:text-rose-900 dark:hover:text-white transition-all cursor-pointer shadow-sm ${isExpanded ? '' : 'lg:px-0'}`}
               >
-                Admin
+                <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                <span className={isExpanded ? '' : 'lg:hidden'}>Sign Out</span>
               </button>
-              <button
-                onClick={() => switchRole('employee')}
-                className={`px-2 py-1 rounded text-[11px] font-semibold transition-all ${
-                  currentRole === 'employee'
-                    ? 'bg-purple-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Employee
-              </button>
-            </div>
-          </div>
+            </>
+          ) : (
+            <button
+              onClick={() => openAuthModal('signin')}
+              className="w-full flex items-center justify-between p-2 rounded-xl bg-purple-50 dark:bg-purple-900/40 hover:bg-purple-100 dark:hover:bg-purple-900/60 border border-purple-200 dark:border-purple-700/50 text-xs text-purple-700 dark:text-purple-200 transition-colors"
+            >
+              <span>Not Signed In</span>
+              <span className="font-semibold text-purple-900 dark:text-white underline">Sign In</span>
+            </button>
+          )}
 
         </div>
       </aside>

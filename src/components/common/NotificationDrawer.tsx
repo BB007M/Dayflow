@@ -30,12 +30,13 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ isOpen, 
 
   if (!isOpen) return null;
 
-  // Filter notifications relevant to current persona
+  // Filter notifications relevant to current persona:
+  // Admins see all administrative, system, and workflow notifications
+  // Employees ONLY see notifications specifically related to them (targeted to their employeeId)
   const userNotifications = notifications.filter((n) => {
-    if (n.targetRole === 'all') return true;
-    if (n.targetRole === currentRole) return true;
-    if (n.targetEmployeeId && n.targetEmployeeId === currentUser.employeeId) return true;
-    return false;
+    if (!currentUser) return false;
+    if (currentRole === 'admin') return true;
+    return n.targetEmployeeId === currentUser.employeeId;
   });
 
   const getIcon = (type: string) => {
